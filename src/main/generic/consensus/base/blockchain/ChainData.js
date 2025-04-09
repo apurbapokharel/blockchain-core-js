@@ -121,3 +121,87 @@ class ChainData {
     }
 }
 Class.register(ChainData);
+
+class SuperBlockCounts {
+    /**
+     * @constructor
+     * @param {Array.<number>} array
+     */
+    constructor(array = []) {
+        this._arr = array;
+    }
+
+    /**
+     * @param {number} depth
+     */
+    add(depth) {
+        Assert.that(NumberUtils.isUint8(depth));
+        for (let i = 0; i <= depth; i++) {
+            this._arr[i] = this.get(i) + 1;
+        }
+    }
+
+    /**
+     * @param {number} depth
+     */
+    subtract(depth) {
+        Assert.that(NumberUtils.isUint8(depth));
+        for (let i = 0; i <= depth; i++) {
+            this._arr[i]--;
+            Assert.that(this._arr[i] >= 0);
+        }
+    }
+
+    /**
+     * @param {number} depth
+     * @returns {SuperBlockCounts}
+     */
+    copyAndAdd(depth) {
+        const copy = new SuperBlockCounts(this._arr.slice());
+        copy.add(depth);
+        return copy;
+    }
+
+    /**
+     * @param {number} depth
+     * @returns {SuperBlockCounts}
+     */
+    copyAndSubtract(depth) {
+        const copy = new SuperBlockCounts(this._arr.slice());
+        copy.subtract(depth);
+        return copy;
+    }
+
+    /**
+     * @param {number} depth
+     * @returns {number}
+     */
+    get(depth) {
+        Assert.that(NumberUtils.isUint8(depth));
+        return this._arr[depth] || 0;
+    }
+
+    /**
+     * @param {number} m
+     * @returns {number}
+     */
+    getCandidateDepth(m) {
+        for (let i = this._arr.length - 1; i >= 0; i--) {
+            if (this._arr[i] >= m) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    /** @type {number} */
+    get length() {
+        return this._arr.length;
+    }
+
+    /** @type {Array.<number>} */
+    get array() {
+        return this._arr;
+    }
+}
+Class.register(SuperBlockCounts);

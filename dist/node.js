@@ -24928,6 +24928,52 @@ class FullConsensusAgent extends BaseConsensusAgent {
         return [];
     }
 }
+/**
+ * Maximum number of blockchain sync retries before closing the connection.
+ * XXX If the peer is on a long fork, it will count as a failed sync attempt
+ * if our blockchain doesn't switch to the fork within 500 (max InvVectors returned by getBlocks)
+ * blocks.
+ * @type {number}
+ */
+FullConsensusAgent.SYNC_ATTEMPTS_MAX = 25;
+/**
+ * Maximum number of inventory vectors to sent in the response for onGetBlocks.
+ * @type {number}
+ */
+FullConsensusAgent.GETBLOCKS_VECTORS_MAX = 500;
+/**
+ * Time {ms} to wait before triggering a blockchain re-sync with the peer.
+ * @type {number}
+ */
+FullConsensusAgent.RESYNC_THROTTLE = 1000 * 3; // 3 seconds
+/**
+ * Minimum time {ms} to wait before triggering the initial mempool request.
+ * @type {number}
+ */
+FullConsensusAgent.MEMPOOL_DELAY_MIN = 1000 * 2; // 2 seconds
+/**
+ * Maximum time {ms} to wait before triggering the initial mempool request.
+ * @type {number}
+ */
+FullConsensusAgent.MEMPOOL_DELAY_MAX = 1000 * 20; // 20 seconds
+/**
+ * Time {ms} to wait between sending full inv vectors of transactions during Mempool request
+ * @type {number}
+ */
+FullConsensusAgent.MEMPOOL_THROTTLE = 1000;
+/**
+ * Number of transaction vectors to send
+ * @type {number}
+ */
+FullConsensusAgent.MEMPOOL_ENTRIES_MAX = 10000;
+FullConsensusAgent.CHAIN_PROOF_RATE_LIMIT = 3; // per minute
+FullConsensusAgent.ACCOUNTS_PROOF_RATE_LIMIT = 60; // per minute
+FullConsensusAgent.ACCOUNTS_TREE_CHUNK_RATE_LIMIT = 300; // per minute
+FullConsensusAgent.TRANSACTION_PROOF_RATE_LIMIT = 180; // per minute
+FullConsensusAgent.TRANSACTION_RECEIPTS_RATE_LIMIT = 30; // per minute
+FullConsensusAgent.BLOCK_PROOF_RATE_LIMIT = 180; // per minute
+FullConsensusAgent.GET_BLOCKS_RATE_LIMIT = 30; // per minute
+Class.register(FullConsensusAgent);
 class FullConsensus extends BaseConsensus {
     /**
      * @param {FullChain} blockchain

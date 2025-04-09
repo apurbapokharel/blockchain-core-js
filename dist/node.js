@@ -14663,258 +14663,6 @@ class Accounts extends Observable {
 }
 Class.register(Accounts);
 
-// @UP: Changed the blockheader class accordingly
-// @UP: removed interlink hash, nbits, nonce from block and blockheader
-// class BlockHeader {
-//     /**
-//      * @param {Hash} prevHash
-//      * @param {Hash} interlinkHash
-//      * @param {Hash} bodyHash
-//      * @param {Hash} accountsHash
-//      * @param {number} nBits
-//      * @param {number} height
-//      * @param {number} timestamp
-//      * @param {number} nonce
-//      * @param {number} version
-//      */
-//     constructor(prevHash, interlinkHash, bodyHash, accountsHash, nBits, height, timestamp, nonce, version = BlockHeader.CURRENT_VERSION) {
-//         if (!NumberUtils.isUint16(version)) throw new Error('Malformed version');
-//         if (!Hash.isHash(prevHash)) throw new Error('Malformed prevHash');
-//         if (!Hash.isHash(interlinkHash)) throw new Error('Malformed interlinkHash');
-//         if (!Hash.isHash(bodyHash)) throw new Error('Malformed bodyHash');
-//         if (!Hash.isHash(accountsHash)) throw new Error('Malformed accountsHash');
-//         if (!NumberUtils.isUint32(nBits) || !BlockUtils.isValidCompact(nBits)) throw new Error('Malformed nBits');
-//         if (!NumberUtils.isUint32(height)) throw new Error('Invalid height');
-//         if (!NumberUtils.isUint32(timestamp)) throw new Error('Malformed timestamp');
-//         if (!NumberUtils.isUint32(nonce)) throw new Error('Malformed nonce');
-
-//         /** @type {number} */
-//         this._version = version;
-//         /** @type {Hash} */
-//         this._prevHash = prevHash;
-//         /** @type {Hash} */
-//         this._interlinkHash = interlinkHash;
-//         /** @type {Hash} */
-//         this._bodyHash = bodyHash;
-//         /** @type {Hash} */
-//         this._accountsHash = accountsHash;
-//         /** @type {number} */
-//         this._nBits = nBits;
-//         /** @type {number} */
-//         this._height = height;
-//         /** @type {number} */
-//         this._timestamp = timestamp;
-//         /** @type {number} */
-//         this._nonce = nonce;
-//     }
-
-//     /**
-//      * @param {SerialBuffer} buf
-//      * @returns {BlockHeader}
-//      */
-//     static unserialize(buf) {
-//         const version = buf.readUint16();
-//         if (!BlockHeader.SUPPORTED_VERSIONS.includes(version)) throw new Error(`Unsupported block version ${version}`);
-//         const prevHash = Hash.unserialize(buf);
-//         const interlinkHash = Hash.unserialize(buf);
-//         const bodyHash = Hash.unserialize(buf);
-//         const accountsHash = Hash.unserialize(buf);
-//         const nBits = buf.readUint32();
-//         const height = buf.readUint32();
-//         const timestamp = buf.readUint32();
-//         const nonce = buf.readUint32();
-//         return new BlockHeader(prevHash, interlinkHash, bodyHash, accountsHash, nBits, height, timestamp, nonce, version);
-//     }
-
-//     /**
-//      * @param {SerialBuffer} [buf]
-//      * @returns {SerialBuffer}
-//      */
-//     serialize(buf) {
-//         buf = buf || new SerialBuffer(this.serializedSize);
-//         buf.writeUint16(this._version);
-//         this._prevHash.serialize(buf);
-//         this._interlinkHash.serialize(buf);
-//         this._bodyHash.serialize(buf);
-//         this._accountsHash.serialize(buf);
-//         buf.writeUint32(this._nBits);
-//         buf.writeUint32(this._height);
-//         buf.writeUint32(this._timestamp);
-//         buf.writeUint32(this._nonce);
-//         return buf;
-//     }
-
-//     /** @type {number} */
-//     get serializedSize() {
-//         return /*version*/ 2
-//             + this._prevHash.serializedSize
-//             + this._interlinkHash.serializedSize
-//             + this._bodyHash.serializedSize
-//             + this._accountsHash.serializedSize
-//             + /*nBits*/ 4
-//             + /*height*/ 4
-//             + /*timestamp*/ 4
-//             + /*nonce*/ 4;
-//     }
-
-//     /**
-//      * @param {SerialBuffer} [buf]
-//      * @return {Promise.<boolean>}
-//      */
-//     async verifyProofOfWork(buf) {
-//         const pow = await this.pow(buf);
-//         return BlockUtils.isProofOfWork(pow, this.target);
-//     }
-
-//     /**
-//      * @param {BlockHeader} prevHeader
-//      * @returns {boolean}
-//      */
-//     isImmediateSuccessorOf(prevHeader) {
-//         // Check that the height is one higher than the previous height.
-//         if (this.height !== prevHeader.height + 1) {
-//             return false;
-//         }
-
-//         // Check that the timestamp is greater or equal to the predecessor's timestamp.
-//         if (this.timestamp < prevHeader.timestamp) {
-//             return false;
-//         }
-
-//         // Check that the hash of the predecessor block equals prevHash.
-//         const prevHash = prevHeader.hash();
-//         if (!this.prevHash.equals(prevHash)) {
-//             return false;
-//         }
-
-//         // Everything checks out.
-//         return true;
-//     }
-
-//     /**
-//      * @param {SerialBuffer} [buf]
-//      * @return {Hash}
-//      */
-//     hash(buf) {
-//         this._hash = this._hash || Hash.light(this.serialize(buf));
-//         return this._hash;
-//     }
-    
-//     /**
-//      * @param {SerialBuffer} [buf]
-//      * @return {Promise.<Hash>}
-//      */
-//     async pow(buf) {
-//         this._pow = this._pow || await Hash.hard(this.serialize(buf));
-//         return this._pow;
-//     }
-
-//     /**
-//      * @param {BlockHeader|*} o
-//      * @returns {boolean}
-//      */
-//     equals(o) {
-//         return o instanceof BlockHeader
-//             && this._prevHash.equals(o.prevHash)
-//             && this._interlinkHash.equals(o.interlinkHash)
-//             && this._bodyHash.equals(o.bodyHash)
-//             && this._accountsHash.equals(o.accountsHash)
-//             && this._nBits === o.nBits
-//             && this._height === o.height
-//             && this._timestamp === o.timestamp
-//             && this._nonce === o.nonce;
-//     }
-
-//     /**
-//      * @returns {string}
-//      */
-//     toString() {
-//         return 'BlockHeader{'
-//             + `prevHash=${this._prevHash}, `
-//             + `interlinkHash=${this._interlinkHash}, `
-//             + `bodyHash=${this._bodyHash}, `
-//             + `accountsHash=${this._accountsHash}, `
-//             + `nBits=${this._nBits.toString(16)}, `
-//             + `height=${this._height}, `
-//             + `timestamp=${this._timestamp}, `
-//             + `nonce=${this._nonce}`
-//             + '}';
-//     }
-
-//     /** @type {number} */
-//     get version() {
-//         return this._version;
-//     }
-
-//     /** @type {Hash} */
-//     get prevHash() {
-//         return this._prevHash;
-//     }
-
-//     /** @type {Hash} */
-//     get interlinkHash() {
-//         return this._interlinkHash;
-//     }
-
-//     /** @type {Hash} */
-//     get bodyHash() {
-//         return this._bodyHash;
-//     }
-
-//     /** @type {Hash} */
-//     get accountsHash() {
-//         return this._accountsHash;
-//     }
-
-//     /** @type {number} */
-//     get nBits() {
-//         return this._nBits;
-//     }
-
-//     /** @type {BigNumber} */
-//     get target() {
-//         return BlockUtils.compactToTarget(this._nBits);
-//     }
-
-//     /** @type {BigNumber} */
-//     get difficulty() {
-//         return BlockUtils.compactToDifficulty(this._nBits);
-//     }
-
-//     /** @type {number} */
-//     get height() {
-//         return this._height;
-//     }
-
-//     /** @type {number} */
-//     get timestamp() {
-//         return this._timestamp;
-//     }
-
-//     /** @type {number} */
-//     get nonce() {
-//         return this._nonce;
-//     }
-
-//     // XXX The miner changes the nonce of an existing BlockHeader during the
-//     // mining process.
-//     /** @type {number} */
-//     set nonce(n) {
-//         this._nonce = n;
-//         this._hash = null;
-//         this._pow = null;
-//     }
-// }
-// BlockHeader.Version = {
-//     V1: 1
-// };
-// BlockHeader.CURRENT_VERSION = BlockHeader.Version.V1;
-// BlockHeader.SUPPORTED_VERSIONS = [
-//     BlockHeader.Version.V1
-// ];
-// BlockHeader.SERIALIZED_SIZE = 146;
-// Class.register(BlockHeader);
-
 class BlockHeader {
     /**
      * @param {Hash} prevHash
@@ -17302,21 +17050,18 @@ class TransactionReceipt {
 
 Class.register(TransactionReceipt);
 
+// @UP: changing block class so that it does not have blockinterlink
 class Block {
     /**
      * @param {BlockHeader} header
-     * @param {BlockInterlink} interlink
      * @param {BlockBody} [body]
      */
-    constructor(header, interlink, body) {
+    constructor(header, body) {
         if (!(header instanceof BlockHeader)) throw new Error('Malformed header');
-        if (!(interlink instanceof BlockInterlink)) throw new Error('Malformed interlink');
         if (body && !(body instanceof BlockBody)) throw new Error('Malformed body');
 
         /** @type {BlockHeader} */
         this._header = header;
-        /** @type {BlockInterlink} */
-        this._interlink = interlink;
         /** @type {BlockBody} */
         this._body = body;
     }
@@ -17327,7 +17072,6 @@ class Block {
      */
     static unserialize(buf) {
         const header = BlockHeader.unserialize(buf);
-        const interlink = BlockInterlink.unserialize(buf, header.prevHash);
 
         let body = undefined;
         const bodyPresent = buf.readUint8();
@@ -17335,7 +17079,7 @@ class Block {
             body = BlockBody.unserialize(buf);
         }
 
-        return new Block(header, interlink, body);
+        return new Block(header, body);
     }
 
     /**
@@ -17345,7 +17089,6 @@ class Block {
     serialize(buf) {
         buf = buf || new SerialBuffer(this.serializedSize);
         this._header.serialize(buf);
-        this._interlink.serialize(buf);
 
         if (this._body) {
             buf.writeUint8(1);
@@ -17360,7 +17103,6 @@ class Block {
     /** @type {number} */
     get serializedSize() {
         return this._header.serializedSize
-            + this._interlink.serializedSize
             + /*bodyPresent*/ 1
             + (this._body ? this._body.serializedSize : 0);
     }
@@ -17375,13 +17117,14 @@ class Block {
                 // worker overhead doesn't pay off for small transaction numbers
                 this._valid = await this._verify(time.now());
             } else {
+                //@UP: TODO: This can be removed execution should never flow here
+                // as txn.length cannot be >=150.
                 const transactionValid = this.body.transactions.map(t => t._valid);
                 const worker = await CryptoWorker.getInstanceAsync();
-                const {valid, pow, interlinkHash, bodyHash} = await worker.blockVerify(this.serialize(),
+                const {valid, pow, bodyHash} = await worker.blockVerify(this.serialize(),
                     transactionValid, time.now(), GenesisConfig.GENESIS_HASH.serialize(), GenesisConfig.NETWORK_ID);
                 this._valid = valid;
                 this.header._pow = Hash.unserialize(new SerialBuffer(pow));
-                this.interlink._hash = Hash.unserialize(new SerialBuffer(interlinkHash));
                 this.body._hash = Hash.unserialize(new SerialBuffer(bodyHash));
             }
         }
@@ -17399,46 +17142,14 @@ class Block {
             return false;
         }
 
-        // Check that the header hash matches the difficulty.
-        if (!(await this._header.verifyProofOfWork())) {
-            Log.w(Block, 'Invalid block - PoW verification failed');
-            return false;
-        }
-
         // Check that the maximum block size is not exceeded.
         if (this.serializedSize > Policy.BLOCK_SIZE_MAX) {
             Log.w(Block, 'Invalid block - max block size exceeded');
             return false;
         }
 
-        // Verify that the interlink is valid.
-        if (!this._verifyInterlink()) {
-            return false;
-        }
-
         // XXX Verify the body only if it is present.
         if (this.isFull() && !this._verifyBody()) {
-            return false;
-        }
-
-        // Everything checks out.
-        return true;
-    }
-
-    /**
-     * @returns {boolean}
-     * @private
-     */
-    _verifyInterlink() {
-        // Skip check for genesis block due to the cyclic dependency (since the interlink hash contains the genesis block hash).
-        if (this.height === 1 && this._header.interlinkHash.equals(new Hash(null))) {
-            return true;
-        }
-
-        // Check that the interlinkHash given in the header matches the actual interlinkHash.
-        const interlinkHash = this._interlink.hash();
-        if (!this._header.interlinkHash.equals(interlinkHash)) {
-            Log.w(Block, 'Invalid block - interlink hash mismatch');
             return false;
         }
 
@@ -17477,117 +17188,6 @@ class Block {
             return false;
         }
 
-        // Check that the interlink is correct.
-        const interlink = await predecessor.getNextInterlink(this.target, this.version);
-        if (!this._interlink.equals(interlink)) {
-            return false;
-        }
-
-        // Everything checks out.
-        return true;
-    }
-
-    /**
-     * @param {Block} predecessor
-     * @returns {Promise.<boolean>}
-     */
-    async isInterlinkSuccessorOf(predecessor) {
-        // Check that the height is higher than the predecessor's.
-        if (this._header.height <= predecessor.header.height) {
-            Log.v(Block, 'No interlink successor - height');
-            return false;
-        }
-
-        // Check that the timestamp is greater or equal to the predecessor's timestamp.
-        if (this._header.timestamp < predecessor.header.timestamp) {
-            Log.v(Block, 'No interlink successor - timestamp');
-            return false;
-        }
-
-        // Check that the predecessor is contained in this block's interlink and verify its position.
-        const prevHash = predecessor.hash();
-        if (!GenesisConfig.GENESIS_HASH.equals(prevHash)) {
-            const prevPow = await predecessor.pow();
-            const targetHeight = BlockUtils.getTargetHeight(this.target);
-            let blockFound = false;
-
-            let depth = 0;
-            for (; depth < this._interlink.length; depth++) {
-                if (prevHash.equals(this._interlink.hashes[depth])) {
-                    blockFound = true;
-                    const target = new BigNumber(2).pow(targetHeight - depth);
-                    if (!BlockUtils.isProofOfWork(prevPow, target)) {
-                        Log.v(Block, 'No interlink successor - invalid position in interlink');
-                        return false;
-                    }
-                }
-            }
-
-            if (!blockFound) {
-                Log.v(Block, 'No interlink successor - not in interlink');
-                return false;
-            }
-        }
-
-        // If the predecessor happens to be the immediate predecessor, check additionally:
-        // - that the height of the successor is one higher
-        // - that the interlink is correct.
-        if (this._header.prevHash.equals(prevHash)) {
-            if (this._header.height !== predecessor.header.height + 1) {
-                Log.v(Block, 'No interlink successor - immediate height');
-                return false;
-            }
-
-            const interlink = await predecessor.getNextInterlink(this.target, this.version);
-            const interlinkHash = interlink.hash();
-            if (!this._header.interlinkHash.equals(interlinkHash)) {
-                Log.v(Block, 'No interlink successor - immediate interlink');
-                return false;
-            }
-        }
-        // Otherwise, if the prevHash doesn't match but the blocks should be adjacent according to their height fields,
-        // this cannot be a valid successor of predecessor.
-        else if (this._header.height === predecessor.header.height + 1) {
-            Log.v(Block, 'No interlink successor - immediate height (2)');
-            return false;
-        }
-        // Otherwise, check that the interlink construction is valid given the information we have.
-        else {
-            // TODO Take different targets into account.
-
-            // The number of new blocks in the interlink is bounded by the height difference.
-            /** @type {HashSet.<Hash>} */
-            const hashes = new HashSet();
-            hashes.addAll(this._interlink.hashes);
-            hashes.removeAll(predecessor.interlink.hashes);
-            if (hashes.length > this._header.height - predecessor.header.height) {
-                Log.v(Block, 'No interlink successor - too many new blocks');
-                return false;
-            }
-
-            // Check that the interlink is not too short.
-            const thisDepth = BlockUtils.getTargetDepth(this.target);
-            const prevDepth = BlockUtils.getTargetDepth(predecessor.target);
-            const depthDiff = thisDepth - prevDepth;
-            if (this._interlink.length < predecessor.interlink.length - depthDiff) {
-                Log.v(Block, 'No interlink successor - interlink too short');
-                return false;
-            }
-
-            // If the same block is found in both interlinks, all blocks at lower depths must be the same in both interlinks.
-            let commonBlock = false;
-            const thisInterlink = this._interlink.hashes;
-            const prevInterlink = predecessor.interlink.hashes;
-            for (let i = 1; i < prevInterlink.length && i - depthDiff < thisInterlink.length; i++) {
-                if (prevInterlink[i].equals(thisInterlink[i - depthDiff])) {
-                    commonBlock = true;
-                } else if (commonBlock) {
-                    Log.v(Block, 'No interlink successor - invalid common suffix');
-                    return false;
-                }
-            }
-        }
-
         // Everything checks out.
         return true;
     }
@@ -17598,47 +17198,14 @@ class Block {
      */
     async isSuccessorOf(predecessor) {
         // TODO Improve this! Lots of duplicate checks.
-        return (await this.isImmediateSuccessorOf(predecessor)) || (await this.isInterlinkSuccessorOf(predecessor));
-    }
-
-    /**
-     * @param {BigNumber} nextTarget
-     * @param {number} [nextVersion]
-     * @returns {Promise.<BlockInterlink>}
-     */
-    async getNextInterlink(nextTarget, nextVersion = BlockHeader.CURRENT_VERSION) {
-        /** @type {Array.<Hash>} */
-        const hashes = [];
-        const hash = this.hash();
-
-        // Compute how many times this blockHash should be included in the next interlink.
-        const thisPowDepth = BlockUtils.getHashDepth(await this.pow());
-        const nextTargetDepth = BlockUtils.getTargetDepth(nextTarget);
-        const numOccurrences = Math.max(thisPowDepth - nextTargetDepth + 1, 0);
-
-        // Push this blockHash numOccurrences times onto the next interlink.
-        for (let i = 0; i < numOccurrences; i++) {
-            hashes.push(hash);
-        }
-
-        // Compute how many blocks to omit from the beginning of this interlink.
-        const thisTargetDepth = BlockUtils.getTargetDepth(this.target);
-        const targetOffset = nextTargetDepth - thisTargetDepth;
-        const interlinkOffset = numOccurrences + targetOffset;
-
-        // Push the remaining hashes from this interlink.
-        for (let i = interlinkOffset; i < this.interlink.length; i++) {
-            hashes.push(this.interlink.hashes[i]);
-        }
-
-        return new BlockInterlink(hashes, hash);
+        return (await this.isImmediateSuccessorOf(predecessor));
     }
 
     /**
      * @returns {Block}
      */
     shallowCopy() {
-        return new Block(this._header, this._interlink, this._body);
+        return new Block(this._header, this._body);
     }
 
     /**
@@ -17648,7 +17215,6 @@ class Block {
     equals(o) {
         return o instanceof Block
             && this._header.equals(o._header)
-            && this._interlink.equals(o._interlink)
             && (this._body ? this._body.equals(o._body) : !o._body);
     }
 
@@ -17678,7 +17244,7 @@ class Block {
      * @returns {Block}
      */
     toFull(body) {
-        return this.isFull() ? this : new Block(this._header, this._interlink, body);
+        return this.isFull() ? this : new Block(this._header, body);
     }
 
     /**
@@ -17686,13 +17252,6 @@ class Block {
      */
     get header() {
         return this._header;
-    }
-
-    /**
-     * @type {BlockInterlink}
-     */
-    get interlink() {
-        return this._interlink;
     }
 
     /**
@@ -17722,13 +17281,6 @@ class Block {
     /**
      * @type {Hash}
      */
-    get interlinkHash() {
-        return this._header.interlinkHash;
-    }
-
-    /**
-     * @type {Hash}
-     */
     get bodyHash() {
         return this._header.bodyHash;
     }
@@ -17747,6 +17299,7 @@ class Block {
         return this._header.nBits;
     }
 
+    //@UP TODO: these can be removed later 
     /**
      * @type {BigNumber}
      */
@@ -17849,7 +17402,7 @@ class Block {
     static fromPlain(plain) {
         const header = new BlockHeader(
             Hash.fromAny(plain.prevHash),
-            Hash.fromAny(plain.interlinkHash),
+            // Hash.fromAny(plain.interlinkHash),
             Hash.fromAny(plain.bodyHash),
             Hash.fromAny(plain.accountsHash),
             plain.nBits,
@@ -17858,7 +17411,7 @@ class Block {
             plain.nonce,
             plain.version
         );
-        const interlink = new BlockInterlink((plain.interlink.hashes || plain.interlink).map(h => Hash.fromAny(h)), Hash.fromAny(plain.prevHash));
+        // const interlink = new BlockInterlink((plain.interlink.hashes || plain.interlink).map(h => Hash.fromAny(h)), Hash.fromAny(plain.prevHash));
         let body = null;
         if (plain.minerAddr && plain.extraData !== undefined && Array.isArray(plain.transactions) && Array.isArray(plain.prunedAccounts)) {
             body = new BlockBody(
@@ -17868,7 +17421,7 @@ class Block {
                 plain.prunedAccounts.map(pa => PrunedAccount.fromAny(pa))
             );
         }
-        return new Block(header, interlink, body);
+        return new Block(header, body);
     }
 
     toString() {
@@ -17880,7 +17433,7 @@ class Block {
             version: this.version,
             hash: this.hash().toPlain(),
             prevHash: this.prevHash.toPlain(),
-            interlinkHash: this.interlinkHash.toPlain(),
+            // interlinkHash: this.interlinkHash.toPlain(),
             bodyHash: this.bodyHash.toPlain(),
             accountsHash: this.accountsHash.toPlain(),
             nBits: this.nBits,
@@ -17888,7 +17441,7 @@ class Block {
             height: this.height,
             timestamp: this.timestamp,
             nonce: this.nonce,
-            interlink: this.interlink.hashes.map(h => h.toPlain()),
+            // interlink: this.interlink.hashes.map(h => h.toPlain()),
         };
         if (this.isFull()) {
             plain.minerAddr = this.minerAddr.toPlain();
@@ -17902,7 +17455,6 @@ class Block {
 
 Block.TIMESTAMP_DRIFT_MAX = 600 /* seconds */; // 10 minutes
 Class.register(Block);
-
 /**
  * @interface
  */
@@ -18810,24 +18362,21 @@ class BlockProducer {
      * @return {Promise.<Block>}
      */
     async getNextBlock(address, extraData = new Uint8Array(0)) {
-        const nextTarget = await this._blockchain.getNextTarget();
-        const interlink = await this._getNextInterlink(nextTarget);
-        const body = await this._getNextBody(interlink.serializedSize, address, extraData);
-        const header = await this._getNextHeader(nextTarget, interlink, body);
-        if (!(await this._blockchain.getNextTarget()).equals(nextTarget)) return this.getNextBlock(address, extraData);
-        return new Block(header, interlink, body);
+        // const nextTarget = await this._blockchain.getNextTarget();
+        // const interlink = await this._getNextInterlink(nextTarget);
+        const body = await this._getNextBody(address, extraData);
+        const header = await this._getNextHeader(body);
+        // if (!(await this._blockchain.getNextTarget()).equals(nextTarget)) return this.getNextBlock(address, extraData);
+        return new Block(header, body);
     }
 
     /**
-     * @param {BigNumber} nextTarget
-     * @param {BlockInterlink} interlink
      * @param {BlockBody} body
      * @return {Promise.<BlockHeader>}
      * @package
      */
-    async _getNextHeader(nextTarget, interlink, body) {
+    async _getNextHeader(body) {
         const prevHash = this._blockchain.headHash;
-        const interlinkHash = interlink.hash();
         const height = this._blockchain.height + 1;
 
         // Compute next accountsHash.
@@ -18844,37 +18393,33 @@ class BlockProducer {
 
         const bodyHash = body.hash();
         const timestamp = this._getNextTimestamp();
-        const nBits = BlockUtils.targetToCompact(nextTarget);
-        const nonce = 0;
-        return new BlockHeader(prevHash, interlinkHash, bodyHash, accountsHash, nBits, height, timestamp, nonce);
+        return new BlockHeader(prevHash, bodyHash, accountsHash, height, timestamp);
     }
 
     /**
-     * @param {BigNumber} nextTarget
-     * @returns {Promise.<BlockInterlink>}
-     * @package
-     */
-    _getNextInterlink(nextTarget) {
-        return this._blockchain.head.getNextInterlink(nextTarget);
-    }
-
-    /**
-     * @param {number} interlinkSize
      * @param {Address} address
      * @param {Uint8Array} extraData
      * @return {BlockBody}
      * @package
      */
-    async _getNextBody(interlinkSize, address, extraData) {
+    //@UP FIXME: need to fix the size
+    async _getNextBody(address, extraData) {
         const maxSize = Policy.BLOCK_SIZE_MAX
             - BlockHeader.SERIALIZED_SIZE
-            - interlinkSize
             - BlockBody.getMetadataSize(extraData);
         const transactions = await this._mempool.getTransactionsForBlock(maxSize);
-        const prunedAccounts = await this._accounts.gatherToBePrunedAccounts(transactions, this._blockchain.height + 1, this._blockchain.transactionCache);
-        return new BlockBody(address, transactions, extraData, prunedAccounts);
-    }
+        const messages = await this._mempool.getMessagesForBlock(maxSize);
+        let messageString = "";
+        for (const msg of messages){
+            messageString += msg._senderPubKey.toHex() + " : " + msg._decodedMessage + "\n";
+            // console.log("message sent from mempool", msg._decodedMessage);
+        }
+        const byteArray = BufferUtils.fromAscii(messageString);
 
+        const prunedAccounts = await this._accounts.gatherToBePrunedAccounts(transactions, this._blockchain.height + 1, this._blockchain.transactionCache);
+        return new BlockBody(address, transactions, byteArray, prunedAccounts);
+    }
+    
     /**
      * @return {number}
      * @package
@@ -18887,7 +18432,6 @@ class BlockProducer {
 }
 
 Class.register(BlockProducer);
-
 class HeaderChain {
     /**
      * @param {Array.<BlockHeader>} headers
@@ -19122,76 +18666,63 @@ Class.register(ChainProof);
 class ChainData {
     /**
      * @param {Block} block
-     * @param {SuperBlockCounts} [superBlockCounts]
      * @returns {Promise.<ChainData>}
      */
-    static async initial(block, superBlockCounts) {
-        const pow = await block.pow();
-        const totalWork = BlockUtils.realDifficulty(pow);
+    // static async initial(block, superBlockCounts) {
+    static async initial(block) {
+        // const pow = await block.pow();
+        // const totalWork = BlockUtils.realDifficulty(pow);
 
-        const depth = BlockUtils.getHashDepth(pow);
-        if (superBlockCounts) {
-            superBlockCounts = superBlockCounts.copyAndAdd(depth);
-        } else {
-            superBlockCounts = new SuperBlockCounts();
-            superBlockCounts.add(depth);
-        }
+        // const depth = BlockUtils.getHashDepth(pow);
+        // if (superBlockCounts) {
+        //     superBlockCounts = superBlockCounts.copyAndAdd(depth);
+        // } else {
+        //     superBlockCounts = new SuperBlockCounts();
+        //     superBlockCounts.add(depth);
+        // }
+        //         return new ChainData(block, block.difficulty, totalWork, superBlockCounts, true);
 
-        return new ChainData(block, block.difficulty, totalWork, superBlockCounts, true);
+        return new ChainData(block, true);
     }
 
     /**
      * @param {Block} head
-     * @param {BigNumber} totalDifficulty
-     * @param {BigNumber} totalWork
-     * @param {SuperBlockCounts} superBlockCounts
      * @param {boolean} [onMainChain]
      * @param {Hash} [mainChainSuccessor]
      */
-    constructor(head, totalDifficulty, totalWork, superBlockCounts, onMainChain = false, mainChainSuccessor = null) {
+    constructor(head, onMainChain = false, mainChainSuccessor = null) {
         this._head = head;
-        this._totalDifficulty = totalDifficulty;
-        this._totalWork = totalWork;
-        this._superBlockCounts = superBlockCounts;
         this._onMainChain = onMainChain;
         this._mainChainSuccessor = mainChainSuccessor;
         this._height = head.height;
     }
 
     /**
-     * @returns {{_head: SerialBuffer, _totalDifficulty: string, _totalWork: string, _superBlockCounts: Array.<number>, _onMainChain: boolean, _mainChainSuccessor: ?SerialBuffer, _height: number, _pow: SerialBuffer}}
+     * @returns {{_head: SerialBuffer, _onMainChain: boolean, _mainChainSuccessor: ?SerialBuffer, _height: number}}
      */
     toObj() {
-        Assert.that(this._head.header._pow instanceof Hash, 'Expected cached PoW hash');
+        // Assert.that(this._head.header._pow instanceof Hash, 'Expected cached PoW hash');
         return {
             _head: this._head.toLight().serialize(),
-            _totalDifficulty: this._totalDifficulty.toString(),
-            _totalWork: this._totalWork.toString(),
-            _superBlockCounts: this._superBlockCounts.array,
             _onMainChain: this._onMainChain,
             _mainChainSuccessor: this._mainChainSuccessor ? this._mainChainSuccessor.serialize() : null,
-            _height: this._head.height,
-            _pow: this._head.header._pow.serialize()
+            _height: this._head.height
         };
     }
 
     /**
-     * @param {{_head: Uint8Array, _totalDifficulty: string, _totalWork: string, _superBlockCounts: Array.<number>, _onMainChain: boolean, _mainChainSuccessor: ?Uint8Array, _height: number, _pow: Uint8Array}} obj
+     * @param {{_head: Uint8Array, _onMainChain: boolean, _mainChainSuccessor: ?Uint8Array, _height: number, _pow: Uint8Array}} obj
      * @param {string} [hashBase64]
      * @returns {ChainData}
      */
     static fromObj(obj, hashBase64) {
         if (!obj) return null;
         const head = Block.unserialize(new SerialBuffer(obj._head));
-        head.header._pow = Hash.unserialize(new SerialBuffer(obj._pow));
+        // head.header._pow = Hash.unserialize(new SerialBuffer(obj._pow));
         head.header._hash = hashBase64 ? Hash.fromBase64(hashBase64) : null;
-        const superBlockCounts = new SuperBlockCounts(obj._superBlockCounts);
         const successor = obj._mainChainSuccessor ? Hash.unserialize(new SerialBuffer(obj._mainChainSuccessor)) : null;
         return new ChainData(
             head,
-            new BigNumber(obj._totalDifficulty),
-            new BigNumber(obj._totalWork),
-            superBlockCounts,
             obj._onMainChain,
             successor
         );
@@ -19201,7 +18732,7 @@ class ChainData {
      * @returns {ChainData}
      */
     shallowCopy() {
-        return new ChainData(this.head.shallowCopy(), this.totalDifficulty, this.totalWork, this.superBlockCounts, this.onMainChain, this.mainChainSuccessor);
+        return new ChainData(this.head.shallowCopy(), this.onMainChain, this.mainChainSuccessor);
     }
 
     /**
@@ -19209,13 +18740,16 @@ class ChainData {
      * @returns {Promise.<ChainData>}
      */
     async nextChainData(block) {
-        Assert.that(this._totalDifficulty > 0);
+        // Assert.that(this._totalDifficulty > 0);
 
-        const pow = await block.pow();
-        const totalDifficulty = this.totalDifficulty.plus(block.difficulty);
-        const totalWork = this.totalWork.plus(BlockUtils.realDifficulty(pow));
-        const superBlockCounts = this.superBlockCounts.copyAndAdd(BlockUtils.getHashDepth(pow));
-        return new ChainData(block, totalDifficulty, totalWork, superBlockCounts);
+        // const pow = await block.pow();
+        // const totalDifficulty = this.totalDifficulty.plus(block.difficulty);
+        // const totalWork = this.totalWork.plus(BlockUtils.realDifficulty(pow));
+        // const superBlockCounts = this.superBlockCounts.copyAndAdd(BlockUtils.getHashDepth(pow));
+        // return new ChainData(block, totalDifficulty, totalWork, superBlockCounts);
+
+        //TODO: APU: create new chainData
+        return new ChainData(block);
     }
 
     /**
@@ -19223,33 +18757,12 @@ class ChainData {
      * @returns {Promise.<ChainData>}
      */
     async previousChainData(block) {
-        Assert.that(this._totalDifficulty > 0);
-
-        const pow = await this.head.pow();
-        const totalDifficulty = this.totalDifficulty.minus(this.head.difficulty);
-        const totalWork = this.totalWork.minus(BlockUtils.realDifficulty(pow));
-        const superBlockCounts = this.superBlockCounts.copyAndSubtract(BlockUtils.getHashDepth(pow));
-        return new ChainData(block, totalDifficulty, totalWork, superBlockCounts);
+        return new ChainData(block);
     }
 
     /** @type {Block} */
     get head() {
         return this._head;
-    }
-
-    /** @type {BigNumber} */
-    get totalDifficulty() {
-        return this._totalDifficulty;
-    }
-
-    /** @type {BigNumber} */
-    get totalWork() {
-        return this._totalWork;
-    }
-
-    /** @type {SuperBlockCounts} */
-    get superBlockCounts() {
-        return this._superBlockCounts;
     }
 
     /** @type {boolean} */
@@ -19273,91 +18786,6 @@ class ChainData {
     }
 }
 Class.register(ChainData);
-
-class SuperBlockCounts {
-    /**
-     * @constructor
-     * @param {Array.<number>} array
-     */
-    constructor(array = []) {
-        this._arr = array;
-    }
-
-    /**
-     * @param {number} depth
-     */
-    add(depth) {
-        Assert.that(NumberUtils.isUint8(depth));
-        for (let i = 0; i <= depth; i++) {
-            this._arr[i] = this.get(i) + 1;
-        }
-    }
-
-    /**
-     * @param {number} depth
-     */
-    subtract(depth) {
-        Assert.that(NumberUtils.isUint8(depth));
-        for (let i = 0; i <= depth; i++) {
-            this._arr[i]--;
-            Assert.that(this._arr[i] >= 0);
-        }
-    }
-
-    /**
-     * @param {number} depth
-     * @returns {SuperBlockCounts}
-     */
-    copyAndAdd(depth) {
-        const copy = new SuperBlockCounts(this._arr.slice());
-        copy.add(depth);
-        return copy;
-    }
-
-    /**
-     * @param {number} depth
-     * @returns {SuperBlockCounts}
-     */
-    copyAndSubtract(depth) {
-        const copy = new SuperBlockCounts(this._arr.slice());
-        copy.subtract(depth);
-        return copy;
-    }
-
-    /**
-     * @param {number} depth
-     * @returns {number}
-     */
-    get(depth) {
-        Assert.that(NumberUtils.isUint8(depth));
-        return this._arr[depth] || 0;
-    }
-
-    /**
-     * @param {number} m
-     * @returns {number}
-     */
-    getCandidateDepth(m) {
-        for (let i = this._arr.length - 1; i >= 0; i--) {
-            if (this._arr[i] >= m) {
-                return i;
-            }
-        }
-        return 0;
-    }
-
-    /** @type {number} */
-    get length() {
-        return this._arr.length;
-    }
-
-    /** @type {Array.<number>} */
-    get array() {
-        return this._arr;
-    }
-}
-Class.register(SuperBlockCounts);
-
 class ChainDataStore {
     /**
      * @param {JungleDB} jdb
@@ -20057,6 +19485,10 @@ class Mempool extends Observable {
         /** @type {Synchronizer} */
         this._synchronizer = new Synchronizer();
 
+        //@UP: For message mempool
+        /** @type {HashMap.<Hash, DeliberationMessage>} */
+        this._messagesByHash = new HashMap();
+
         // Listen for changes in the blockchain head to evict transactions that have become invalid.
         blockchain.on('head-changed', (block, rebranching) => {
             if (!rebranching) {
@@ -20076,6 +19508,11 @@ class Mempool extends Observable {
      */
     pushTransaction(transaction) {
         return this._synchronizer.push(() => this._pushTransaction(transaction));
+    }
+
+    // @UP
+    pushMessage(message) {
+        return this._synchronizer.push(() => this._pushMessage(message));
     }
 
     /**
@@ -20205,6 +19642,21 @@ class Mempool extends Observable {
         return Mempool.ReturnCode.ACCEPTED;
     }
 
+    // @UP
+    async _pushMessage(message) {
+        // Check if we already know this message.
+        const hash = message.hash();
+        if (this._messagesByHash.contains(hash)) {
+            return Mempool.ReturnCode.KNOWN;
+        }
+
+        this._messagesByHash.put(hash, message);
+
+        this.fire('message-added', message);
+
+        return Mempool.ReturnCode.ACCEPTED;
+    }
+
     /**
      * @private
      */
@@ -20266,6 +19718,15 @@ class Mempool extends Observable {
         return this._transactionsByHash.get(hash);
     }
 
+    // @UP
+    /**
+     * @param {Hash} hash
+     * @returns {Transaction}
+     */
+    getMessage(hash) {
+        return this._messagesByHash.get(hash);
+    }
+
     /**
      * @param {number} [maxSize]
      * @param {number} [minFeePerByte]
@@ -20292,6 +19753,34 @@ class Mempool extends Observable {
         return Array.from(this.transactionGenerator(maxSize, minFeePerByte));
     }
 
+    // @UP
+    /**
+     * @param {number} [maxSize]
+     * @yields {IterableIterator.<Transaction>}
+     */
+     *messageGenerator(maxSize = Infinity) {
+        let size = 0;
+        for (const [hash, msg] of this._messagesByHash.entryIterator()) {
+
+        // for (const /** @type {DeliberationMessage} */ msg of this._messagesByHash) {
+            const msgSize = msg.serializedSize;
+            if (size + msgSize >= maxSize) continue;
+
+            yield msg;
+            size += msgSize;
+        }
+    }
+    
+    // @UP
+    /**
+     * @param {number} [maxSize]
+     * @returns {Array.<Transaction>}
+     */
+    getMessages(maxSize = Infinity) {
+        return Array.from(this.messageGenerator(maxSize));
+    }
+
+
     /**
      * @param {number} maxSize
      * @returns {Promise.<Array.<Transaction>>}
@@ -20308,6 +19797,16 @@ class Mempool extends Observable {
 
         transactions.sort((a, b) => a.compareBlockOrder(b));
         return transactions;
+    }
+
+    // @UP
+    /**
+     * @param {number} maxSize
+     * @returns {Promise.<Array.<Transaction>>}
+     */
+    async getMessagesForBlock(maxSize) {
+        const messages = this.getMessages(maxSize);
+        return messages;
     }
 
     /**
@@ -20489,6 +19988,11 @@ class Mempool extends Observable {
             }
         }
 
+        //@UP: Remove the messages from the mempool
+        for (const [hash, msg] of this._messagesByHash.entryIterator()) {
+            this._messagesByHash.remove(hash)
+        }
+
         // Tell listeners that the pool has updated after a blockchain head change.
         /**
          * @event Mempool#transactions-ready
@@ -20600,6 +20104,55 @@ class DeliberationMessage {
     }
 }
 Class.register(DeliberationMessage);
+class DeliMessage extends Message{
+    /**
+     * @param {DeliberationMessage} message
+     */
+    constructor(message) {
+        super(Message.Type.MSG);
+        /** @type {TransacDeliberationMessagetion} */
+        this._message = message;
+    }
+
+    /**
+     * @param {SerialBuffer} buf
+     * @returns {DeliMessage}
+     */
+    static unserialize(buf) {
+        Message.unserialize(buf);
+        const message = DeliberationMessage.unserialize(buf);
+        return new DeliMessage(message);
+    }
+
+    /**
+     * @param {SerialBuffer} [buf]
+     * @returns {SerialBuffer}
+     */
+    serialize(buf) {
+        buf = buf || new SerialBuffer(this.serializedSize);
+        super.serialize(buf);
+        this._message.serialize(buf);
+        super._setChecksum(buf);
+        return buf;
+    }
+
+    /** @type {number} */
+    get serializedSize() {
+        let size = super.serializedSize
+            + this._message.serializedSize;
+        return size;
+    }
+
+    /** @type {DeliberationMessage} */
+    get message() {
+        return this._message;
+    }
+
+    toString() {
+        return `DeliMessage{hash=${this._message.hash()}}`;
+    }
+}
+Class.register(DeliMessage)
 class InvRequestManager {
     constructor() {
         /** @type {HashMap.<InvVector, {current: BaseConsensusAgent, waiting: Set.<BaseConsensusAgent>}>} */
@@ -20717,6 +20270,15 @@ class BaseConsensusAgent extends Observable {
             BaseConsensusAgent.TRANSACTIONS_PER_SECOND + BaseConsensusAgent.FREE_TRANSACTIONS_PER_SECOND,
             1000, BaseConsensusAgent.REQUEST_TRANSACTIONS_WAITING_MAX);
 
+        //@UP: making this the same as txn as we want msg to be passed with the same 
+        // frequency as transaction are passsed.
+        // The above reasoning may or may not be the case, an intutive guess
+
+        this._msgsToRequest = new ThrottledQueue(
+            BaseConsensusAgent.TRANSACTIONS_AT_ONCE + BaseConsensusAgent.FREE_TRANSACTIONS_AT_ONCE,
+            BaseConsensusAgent.TRANSACTIONS_PER_SECOND + BaseConsensusAgent.FREE_TRANSACTIONS_PER_SECOND,
+            1000, BaseConsensusAgent.REQUEST_TRANSACTIONS_WAITING_MAX);
+        
         // Objects that are currently being requested from the peer.
         /** @type {HashSet.<InvVector>} */
         this._objectsInFlight = new HashSet();
@@ -20786,6 +20348,7 @@ class BaseConsensusAgent extends Observable {
         this._onToDisconnect(peer.channel, 'block', msg => this._onBlock(msg));
         this._onToDisconnect(peer.channel, 'header', msg => this._onHeader(msg));
         this._onToDisconnect(peer.channel, 'tx', msg => this._onTx(msg));
+        this._onToDisconnect(peer.channel, 'msg', msg => this._onMsg(msg));
         this._onToDisconnect(peer.channel, 'not-found', msg => this._onNotFound(msg));
 
         this._onToDisconnect(peer.channel, 'subscribe', msg => this._onSubscribe(msg));
@@ -20797,6 +20360,7 @@ class BaseConsensusAgent extends Observable {
         this._onToDisconnect(peer.channel, 'transaction-receipts', msg => this._onTransactionReceipts(msg));
 
         this._onToDisconnect(peer.channel, 'mempool', msg => this._onMempool(msg));
+        // this._onToDisconnect(peer.channel, 'mempool', msg => this.sendMessage(msg));
 
         this._onToDisconnect(peer.channel, 'get-head', msg => this._onGetHead(msg));
         this._onToDisconnect(peer.channel, 'head', msg => this._onHead(msg));
@@ -20886,6 +20450,7 @@ class BaseConsensusAgent extends Observable {
      * @returns {boolean}
      */
     relayBlock(block) {
+        // console.log("realy block called", block);
         // Don't relay block if have not synced with the peer yet.
         if (!this._synced) {
             return false;
@@ -20898,6 +20463,8 @@ class BaseConsensusAgent extends Observable {
 
         // Create InvVector.
         const vector = InvVector.fromBlock(block);
+
+        // console.log("realy block, block inv vector", vector);
 
         // Don't relay block to this peer if it already knows it.
         if (this._knownObjects.contains(vector)) {
@@ -20918,92 +20485,11 @@ class BaseConsensusAgent extends Observable {
     }
 
     /**
-     * @param {Hash} hash
-     * @return {Promise.<?Block>}
-     */
-    requestBlock(hash) {
-        return new Promise((resolve, reject) => {
-            const vector = new InvVector(InvVector.Type.BLOCK, hash);
-            if (this._pendingRequests.contains(vector)) {
-                this._pendingRequests.get(vector).push({resolve, reject});
-            } else {
-                this._pendingRequests.put(vector, [{resolve, reject}]);
-
-                this._peer.channel.getData([vector]);
-
-                this._timers.setTimeout(`block-request-${vector.hash.toBase64()}`, () => {
-                    const requests = this._pendingRequests.get(vector);
-                    if (!requests) return;
-
-                    this._pendingRequests.remove(vector);
-
-                    for (const {reject} of requests) {
-                        reject(new Error('Timeout'));
-                    }
-                }, BaseConsensusAgent.REQUEST_TIMEOUT);
-            }
-        });
-    }
-
-    /**
-     * @param {Hash} hash
-     * @return {Promise.<?Transaction>}
-     */
-    requestTransaction(hash) {
-        return new Promise((resolve, reject) => {
-            const vector = new InvVector(InvVector.Type.TRANSACTION, hash);
-            if (this._pendingRequests.contains(vector)) {
-                this._pendingRequests.get(vector).push({resolve, reject});
-            } else {
-                this._pendingRequests.put(vector, [{resolve, reject}]);
-
-                if (!this._objectsInFlight.contains(vector)) {
-                    this._peer.channel.getData([vector]);
-                    this._objectsInFlight.add(vector);
-                }
-
-                this._timers.setTimeout(`tx-request-${vector.hash.toBase64()}`, () => {
-                    const requests = this._pendingRequests.get(vector);
-                    if (!requests) return;
-
-                    this._pendingRequests.remove(vector);
-
-                    for (const {reject} of requests) {
-                        reject(new Error('Timeout'));
-                    }
-                }, BaseConsensusAgent.REQUEST_TIMEOUT);
-            }
-        });
-    }
-
-    _sendWaitingInvVectors() {
-        const invVectors = this._waitingInvVectors.dequeueMulti(BaseInventoryMessage.VECTORS_MAX_COUNT);
-        if (invVectors.length > 0) {
-            this._peer.channel.inv(invVectors);
-            Log.v(BaseConsensusAgent, () => `[INV] Sent ${invVectors.length} vectors to ${this._peer.peerAddress}`);
-        }
-    }
-
-    _sendFreeWaitingInvVectors() {
-        const invVectors = [];
-        let size = 0;
-        while (invVectors.length < BaseInventoryMessage.VECTORS_MAX_COUNT && this._waitingFreeInvVectors.isAvailable()
-            && size < BaseConsensusAgent.FREE_TRANSACTION_SIZE_PER_INTERVAL) {
-            const freeTransaction = this._waitingFreeInvVectors.dequeue();
-            invVectors.push(freeTransaction.inv);
-            size += freeTransaction.serializedSize;
-        }
-        if (invVectors.length > 0) {
-            this._peer.channel.inv(invVectors);
-            Log.v(BaseConsensusAgent, () => `[INV] Sent ${invVectors.length} vectors to ${this._peer.peerAddress}`);
-        }
-    }
-
-    /**
      * @param {Transaction} transaction
      * @return {boolean}
      */
     relayTransaction(transaction) {
+        // console.log("realy transaction called");
         // Only relay transaction if it matches the peer's subscription.
         if (!this._remoteSubscription.matchesTransaction(transaction)) {
             Log.v(BaseConsensusAgent, `Not sending ${transaction.hash()} to ${this.peer.peerAddress}: not subscribed`);
@@ -21037,10 +20523,128 @@ class BaseConsensusAgent extends Observable {
         return true;
     }
 
+    relayMessage(message) {
+        // console.log("relay message");
+        // @UP: Dont know what this means but; Only relay message if it matches the peer's subscription.
+        
+        const vector = InvVector.fromMessage(message);
+
+        // Don't relay message to this peer if it already knows it.
+        if (this._knownObjects.contains(vector)) {
+            Log.v(BaseConsensusAgent, `Not sending ${message.hash()} to ${this.peer.peerAddress}: already knows`);
+            return false;
+        }
+
+        // Relay transaction to peer later.
+        const serializedSize = message.serializedSize;
+        // APU: we can send it as a freeInvVector later
+        this._waitingInvVectors.enqueue(vector);
+
+        // Assume that the peer knows this message after short time.
+        this._timers.setTimeout(`knows-tx-${vector.hash.toBase64()}`, () => {
+            this._knownObjects.add(vector);
+        }, BaseConsensusAgent.KNOWS_OBJECT_AFTER_INV_DELAY);
+
+        Log.v(BaseConsensusAgent, `Sending ${message.hash()} to ${this.peer.peerAddress}`);
+
+        return true;
+    }
+
+
+    /**
+     * @param {Hash} hash
+     * @return {Promise.<?Block>}
+     */
+    requestBlock(hash) {
+        // console.log("request bkock called", hash);
+        return new Promise((resolve, reject) => {
+            const vector = new InvVector(InvVector.Type.BLOCK, hash);
+            if (this._pendingRequests.contains(vector)) {
+                this._pendingRequests.get(vector).push({resolve, reject});
+            } else {
+                this._pendingRequests.put(vector, [{resolve, reject}]);
+
+                this._peer.channel.getData([vector]);
+
+                this._timers.setTimeout(`block-request-${vector.hash.toBase64()}`, () => {
+                    const requests = this._pendingRequests.get(vector);
+                    if (!requests) return;
+
+                    this._pendingRequests.remove(vector);
+
+                    for (const {reject} of requests) {
+                        reject(new Error('Timeout'));
+                    }
+                }, BaseConsensusAgent.REQUEST_TIMEOUT);
+            }
+        });
+    }
+
+    /**
+     * @param {Hash} hash
+     * @return {Promise.<?Transaction>}
+     */
+    requestTransaction(hash) {
+        // console.log("request txn called", hash);
+        return new Promise((resolve, reject) => {
+            const vector = new InvVector(InvVector.Type.TRANSACTION, hash);
+            if (this._pendingRequests.contains(vector)) {
+                this._pendingRequests.get(vector).push({resolve, reject});
+            } else {
+                this._pendingRequests.put(vector, [{resolve, reject}]);
+
+                if (!this._objectsInFlight.contains(vector)) {
+                    this._peer.channel.getData([vector]);
+                    this._objectsInFlight.add(vector);
+                }
+
+                this._timers.setTimeout(`tx-request-${vector.hash.toBase64()}`, () => {
+                    const requests = this._pendingRequests.get(vector);
+                    if (!requests) return;
+
+                    this._pendingRequests.remove(vector);
+
+                    for (const {reject} of requests) {
+                        reject(new Error('Timeout'));
+                    }
+                }, BaseConsensusAgent.REQUEST_TIMEOUT);
+            }
+        });
+    }
+
+    // @UP FIXME: Request message missing 
+
+    _sendWaitingInvVectors() {
+        const invVectors = this._waitingInvVectors.dequeueMulti(BaseInventoryMessage.VECTORS_MAX_COUNT);
+        if (invVectors.length > 0) {
+            // console.log("waiting inv vector called");
+            this._peer.channel.inv(invVectors);
+            Log.v(BaseConsensusAgent, () => `[INV] Sent ${invVectors.length} vectors to ${this._peer.peerAddress}`);
+        }
+    }
+
+    _sendFreeWaitingInvVectors() {
+        // console.log("_sendFreeWaitingInvVectors called");
+        const invVectors = [];
+        let size = 0;
+        while (invVectors.length < BaseInventoryMessage.VECTORS_MAX_COUNT && this._waitingFreeInvVectors.isAvailable()
+            && size < BaseConsensusAgent.FREE_TRANSACTION_SIZE_PER_INTERVAL) {
+            const freeTransaction = this._waitingFreeInvVectors.dequeue();
+            invVectors.push(freeTransaction.inv);
+            size += freeTransaction.serializedSize;
+        }
+        if (invVectors.length > 0) {
+            // console.log("waiting free inv vector called");
+            this._peer.channel.inv(invVectors);
+            Log.v(BaseConsensusAgent, () => `[INV] Sent ${invVectors.length} vectors to ${this._peer.peerAddress}`);
+        }
+    }
+
     /**
      * @param {Transaction} transaction
      */
     removeTransaction(transaction) {
+        // console.log("remove transation called");
         // Create InvVector.
         const vector = InvVector.fromTransaction(transaction);
 
@@ -21049,11 +20653,14 @@ class BaseConsensusAgent extends Observable {
         this._waitingInvVectors.remove(vector);
     }
 
+    // @UP FIXME: removeMessage needed? i remove messaged from mempool once _evicttransactions are called but this could be a better way 
+
     /**
      * @param {Hash} blockHash
      * @returns {boolean}
      */
     knowsBlock(blockHash) {
+        // console.log("knowsBlock called", blockHash);
         const vector = new InvVector(InvVector.Type.BLOCK, blockHash);
         return this._knownObjects.contains(vector);
     }
@@ -21063,6 +20670,7 @@ class BaseConsensusAgent extends Observable {
      * @returns {boolean}
      */
     knowsTransaction(txHash) {
+        // console.log("knowsTxn called", txHash);
         const vector = new InvVector(InvVector.Type.TRANSACTION, txHash);
         return this._knownObjects.contains(vector);
     }
@@ -21081,6 +20689,7 @@ class BaseConsensusAgent extends Observable {
      * @private
      */
     async _onMempool(msg) {
+
         // Query mempool for transactions
         const transactions = this._getSubscribedMempoolTransactions();
 
@@ -21117,6 +20726,7 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     _onInv(msg) {
+        // console.log("_onInv 1 called", msg);
         return this._synchronizer.push('onInv',
             this.__onInv.bind(this, msg));
     }
@@ -21127,6 +20737,17 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     async __onInv(msg) {
+        // console.trace();
+        /**
+         * OnInv binds the functions and calls MultiSynchronizer push
+         * MultiSynchronizer push calls syncronizer push
+         * Synchronizer calls _doWork
+         * doWork callls the binded function __onInv
+         */
+        // console.log("_onInv 2 called");
+        // console.log(this._knownObjects);
+        // console.log(this._waitingInvVectors);
+        // console.log(this._waitingFreeInvVectors);
         // Keep track of the objects the peer knows.
         for (const vector of msg.vectors) {
             this._knownObjects.add(vector);
@@ -21138,6 +20759,7 @@ class BaseConsensusAgent extends Observable {
         // Request unknown objects, ignore known ones.
         const unknownBlocks = [];
         const unknownTxs = [];
+        const unknownMsgs = [];
         for (const vector of msg.vectors) {
             // Ignore objects that we are currently requesting / processing.
             if (this._objectsInFlight.contains(vector) || this._objectsProcessing.contains(vector)) {
@@ -21170,18 +20792,32 @@ class BaseConsensusAgent extends Observable {
                     }
                     break;
                 }
+                case InvVector.Type.MESSAGE: {
+                    const message = this._getMessage(vector.hash);
+                    // console.log("hash inside case",vector.hash, message);
+                    if (!message) {
+                        unknownMsgs.push(vector);
+                        this._onNewMessageAnnounced(vector.hash);
+                    } else {
+                        this._onKnownMessageAnnounced(vector.hash, message);
+                    }
+                    break;
+                }
                 default:
                     // ignore
             }
         }
 
-        Log.v(BaseConsensusAgent, () => `[INV] ${msg.vectors.length} vectors (${unknownBlocks.length} new blocks, ${unknownTxs.length} new txs) received from ${this._peer.peerAddress}`);
+        Log.v(BaseConsensusAgent, () => `[INV] ${msg.vectors.length} vectors (${unknownBlocks.length} new blocks, ${unknownTxs.length} new txs, ${unknownMsgs.length} new msgs) received from ${this._peer.peerAddress}`);
 
-        if (unknownBlocks.length > 0 || unknownTxs.length > 0) {
+        if (unknownBlocks.length > 0 || unknownTxs.length > 0 || unknownMsgs.length > 0) {
             for (const vector of unknownBlocks) {
                 this._invRequestManager.askToRequestVector(this, vector);
             }
             for (const vector of unknownTxs) {
+                this._invRequestManager.askToRequestVector(this, vector);
+            }
+            for (const vector of unknownMsgs) {
                 this._invRequestManager.askToRequestVector(this, vector);
             }
         } else {
@@ -21193,15 +20829,18 @@ class BaseConsensusAgent extends Observable {
      * @param {...InvVector} vector
      */
     requestVector(...vector) {
+        // console.log("vector requested");
+
         // Store unknown vectors in objectsToRequest.
         this._blocksToRequest.enqueueAll(vector.filter(v => v.type === InvVector.Type.BLOCK));
         this._txsToRequest.enqueueAll(vector.filter(v => v.type === InvVector.Type.TRANSACTION));
+        this._msgsToRequest.enqueueAll(vector.filter(v => v.type === InvVector.Type.MESSAGE));
 
         // Clear the request throttle timeout.
         this._timers.clearTimeout('inv');
 
         // If there are enough objects queued up, send out a getData request.
-        if (this._blocksToRequest.length + this._txsToRequest.available >= BaseConsensusAgent.REQUEST_THRESHOLD) {
+        if (this._blocksToRequest.length + this._txsToRequest.available + this._msgsToRequest.available >= BaseConsensusAgent.REQUEST_THRESHOLD) {
             this._requestData();
         }
         // Otherwise, wait a short time for more inv messages to arrive, then request.
@@ -21257,6 +20896,17 @@ class BaseConsensusAgent extends Observable {
 
     /**
      * @param {Hash} hash
+     * @returns {?DeliberationMessage}
+     * @protected
+     * @abstract
+     */
+    _getMessage(hash) {
+        // MUST be implemented by subclasses.
+        throw new Error('not implemented');
+    }
+
+    /**
+     * @param {Hash} hash
      * @returns {void}
      * @protected
      */
@@ -21287,22 +20937,41 @@ class BaseConsensusAgent extends Observable {
     }
 
     /**
+    * @param {Hash} hash
+    * @returns {void}
+    * @protected
+    */
+   _onNewMessageAnnounced(hash) {
+   }
+
+   /**
+    * @param {Hash} hash
+    * @param {DeliberationMessage} message
+    * @returns {void}
+    * @protected
+    */
+   _onKnownMessageAnnounced(hash, message) {
+   }
+
+    /**
      * @returns {void}
      * @protected
      */
     _requestData() {
+        // console.log("data requested");
         // Only one request at a time.
         if (!this._objectsInFlight.isEmpty()) return;
 
         // Don't do anything if there are no objects queued to request.
-        if (this._blocksToRequest.isEmpty() && !this._txsToRequest.isAvailable()) return;
-
+        if (this._blocksToRequest.isEmpty() && !this._txsToRequest.isAvailable() && !this._msgsToRequest.isAvailable()) return;
+        // console.log("after");
         // Request queued objects from the peer. Only request up to VECTORS_MAX_COUNT objects at a time.
         const vectorsMaxCount = BaseInventoryMessage.VECTORS_MAX_COUNT;
         /** @type {Array.<InvVector>} */
         let vectors = this._blocksToRequest.dequeueMulti(vectorsMaxCount);
         if (vectors.length < vectorsMaxCount) {
             vectors = vectors.concat(this._txsToRequest.dequeueMulti(vectorsMaxCount - vectors.length));
+            vectors = vectors.concat(this._msgsToRequest.dequeueMulti(vectorsMaxCount - vectors.length));
         }
 
         // Mark the requested objects as in-flight.
@@ -21321,22 +20990,31 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     _doRequestData(vectors) {
+        // console.log("do request data");
+
         if (this._willRequestHeaders()) {
             /** @type {Array.<InvVector>} */
             const blocks = [];
             /** @type {Array.<InvVector>} */
             const transactions = [];
+            /** @type {Array.<InvVector>} */
+            const messages = [];
             for (const vector of vectors) {
                 if (vector.type === InvVector.Type.BLOCK) {
                     blocks.push(vector);
-                } else {
+                } 
+                else if(vector.type === InvVector.Type.TRANSACTION) {
                     transactions.push(vector);
+                }
+                else{
+                    messages.push(vector);
                 }
             }
 
             // Request headers and transactions from peer.
             this._peer.channel.getHeader(blocks);
             this._peer.channel.getData(transactions);
+            this._peer.channel.getData(messages);
         } else {
             this._peer.channel.getData(vectors);
         }
@@ -21352,6 +21030,8 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     async _onBlock(msg) {
+        // console.log("on block called");
+
         const hash = msg.block.hash();
         const vector = new InvVector(InvVector.Type.BLOCK, hash);
         const blockRequest = this._pendingRequests.get(vector);
@@ -21419,6 +21099,7 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     async _onHeader(msg) {
+        // console.log("on header called");
         const hash = msg.header.hash();
 
         // Check if we have requested this header.
@@ -21460,6 +21141,8 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     async _onTx(msg) {
+        // console.log("on txn called", msg);
+
         const hash = msg.transaction.hash();
         //Log.d(BaseConsensusAgent, () => `[TX] Received transaction ${hash} from ${this._peer.peerAddress}`);
 
@@ -21503,12 +21186,80 @@ class BaseConsensusAgent extends Observable {
     }
 
     /**
+     * @param {DeliberationMessage} msg
+     * @return {Promise}
+     * @protected
+     */
+    async _onMsg(msg) {
+        // console.log("on msg called", msg);
+
+        msg.message.encodeMessage();
+        const hash = msg.message.hash();
+        
+        // Check if we have requested this transaction.
+        const vector = new InvVector(InvVector.Type.MESSAGE, hash);
+        if (!this._objectsInFlight.contains(vector) && !this._objectsThatFlew.contains(vector)) {
+            Log.w(BaseConsensusAgent, `Unsolicited message ${hash} received from ${this._peer.peerAddress}, discarding`);
+            console.log("Inside");
+            return;
+        }
+        
+        this._invRequestManager.noteVectorReceived(InvVector.fromMessage(msg.message));
+
+        // Mark object as received.
+        this._onObjectReceived(vector);
+
+        // Mark message as processing.
+        this._objectsProcessing.add(vector);
+
+        // @UP: TODO: Skipped this just as i have skippe this in relayMessage
+        // @UP: Instead we directly process the message because that is what we need to do anyway
+        //Process message if we subscribed for this transaction.
+        // if (this._localSubscription.matchesTransaction(msg.transaction)) {
+        //     await this._processTransaction(hash, msg.transaction);
+        // }
+
+        await this._processMessage(hash, msg.message);
+
+        const msgRequest = this._pendingRequests.get(vector);
+        if (msgRequest) {
+            this._pendingRequests.remove(vector);
+            this._timers.clearTimeout(`tx-request-${vector.hash.toBase64()}`);
+            for (const {resolve} of msgRequest) {
+                try {
+                    resolve(msg.message);
+                } catch (e) {
+                    // Ignore
+                }
+            }
+        } 
+
+        // @UP: TODO: COmmenenting anything to do with subscription
+        // else if (!this._localSubscription.matchesTransaction(msg.transaction) && this._lastSubscriptionChange + BaseConsensusAgent.SUBSCRIPTION_CHANGE_GRACE_PERIOD > Date.now()) {
+        //     this._peer.channel.close(CloseType.TRANSACTION_NOT_MATCHING_SUBSCRIPTION, 'received transaction not matching our subscription');
+        // }
+
+        // Mark object as processed.
+        this._onObjectProcessed(vector);
+
+    }
+
+    /**
      * @param {Hash} hash
      * @param {Transaction} transaction
      * @returns {Promise.<void>}
      * @protected
      */
     async _processTransaction(hash, transaction) {
+    }
+
+    /**
+     * @param {Hash} hash
+     * @param {DeliberationMessage} message
+     * @returns {Promise.<void>}
+     * @protected
+     */
+    async _processMessage(hash, message) {
     }
 
     /**
@@ -21629,6 +21380,9 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     async _onGetData(msg) {
+        //TODO: @UP ADD DelliberationMessage stuff here
+        // console.log("on get data called");
+
         // Keep track of the objects the peer knows.
         for (const vector of msg.vectors) {
             this._knownObjects.add(vector);
@@ -21663,6 +21417,20 @@ class BaseConsensusAgent extends Observable {
                     }
                     break;
                 }
+                case InvVector.Type.MESSAGE: {
+                    const msg = this._getMessage(vector.hash);
+                    if (msg) {
+                        // We have found a requested message, send it back to the sender.
+                        this._peer.channel.msg(msg);
+                        //@UP TODO: The message-relayed event should be handled appropriately in the future
+                        this.fire('message-relayed', msg);
+                    } else {
+                        // console.log("else");
+                        // Requested transaction is unknown.
+                        unknownObjects.push(vector);
+                    }
+                    break;
+                }
                 default:
                     // ignore
             }
@@ -21680,6 +21448,8 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     async _onGetHeader(msg) {
+        // console.log("on get header called", msg);
+
         // Keep track of the objects the peer knows.
         for (const vector of msg.vectors) {
             this._knownObjects.add(vector);
@@ -22332,6 +22102,7 @@ class BaseConsensus extends Observable {
         // Relay new (verified) transactions to peers.
         this._onToDisconnect(mempool,'transaction-added', tx => this._onTransactionAdded(tx));
         this._onToDisconnect(mempool,'transaction-removed', tx => this._onTransactionRemoved(tx));
+        this._onToDisconnect(mempool,'message-added', msg => this._onMessageAdded(msg));
     }
 
     //
@@ -22498,6 +22269,14 @@ class BaseConsensus extends Observable {
      * @returns {Array.<Transaction>}
      */
     getMempoolContents() {
+        return [];
+    }
+
+    //@UP
+    /**
+     * @returns {Array.<Transaction>}
+     */
+     getMempoolMessages(){
         return [];
     }
 
@@ -22948,6 +22727,16 @@ class BaseConsensus extends Observable {
         }
     }
 
+    _onMessageAdded(msg){
+        // this.fire('message-added', msg)
+        // Don't relay message if we are not synced yet.
+        if (!this._established) return;
+
+        for (const agent of this._agents.valueIterator()) {
+            agent.relayMessage(msg);
+        }
+    }
+    
     /**
      * @param {Transaction} tx
      * @protected
@@ -23727,16 +23516,13 @@ class FullChain extends BaseChain {
             if (!genesis || !genesis.onMainChain) {
                 throw new Error('Invalid genesis block stored. Reset your consensus database.');
             }
-
             // Load main chain from store.
             this._mainChain = await this._store.getChainData(this._headHash, /*includeBody*/ true);
             Assert.that(!!this._mainChain, 'Failed to load main chain from storage');
-
             // Check that chain/accounts state is consistent.
             if (!this._mainChain.head.accountsHash.equals(await this._accounts.hash())) {
                 throw new Error('Corrupted store: Inconsistent chain/accounts state');
             }
-
             // Initialize TransactionCache.
             const blocks = await this._store.getBlocksBackward(this.headHash, this._transactionCache.missingBlocks - 1, /*includeBody*/ true);
             this._transactionCache.prependBlocks([...blocks.reverse(), this._mainChain.head]);
@@ -23744,7 +23530,6 @@ class FullChain extends BaseChain {
             // Initialize chain & accounts with Genesis block.
             this._mainChain = await ChainData.initial(GenesisConfig.GENESIS_BLOCK);
             this._headHash = GenesisConfig.GENESIS_HASH;
-
             const tx = this._store.synchronousTransaction();
             tx.putChainDataSync(GenesisConfig.GENESIS_HASH, this._mainChain);
             tx.setHeadSync(GenesisConfig.GENESIS_HASH);
@@ -23810,13 +23595,14 @@ class FullChain extends BaseChain {
         }
 
         // Check that the difficulty is correct.
-        const nextTarget = await this.getNextTarget(predecessor);
-        Assert.that(BlockUtils.isValidTarget(nextTarget), 'Failed to compute next target in FullChain');
-        if (block.nBits !== BlockUtils.targetToCompact(nextTarget)) {
-            Log.w(FullChain, 'Rejecting block - difficulty mismatch');
-            this._blockInvalidCount++;
-            return FullChain.ERR_INVALID;
-        }
+        // @UP: nothing to do with difficulty now so remove it
+        // const nextTarget = await this.getNextTarget(predecessor);
+        // Assert.that(BlockUtils.isValidTarget(nextTarget), 'Failed to compute next target in FullChain');
+        // if (block.nBits !== BlockUtils.targetToCompact(nextTarget)) {
+        //     Log.w(FullChain, 'Rejecting block - difficulty mismatch');
+        //     this._blockInvalidCount++;
+        //     return FullChain.ERR_INVALID;
+        // }
 
         // Block looks good, create ChainData.
         const chainData = await prevData.nextChainData(block);
@@ -23878,6 +23664,7 @@ class FullChain extends BaseChain {
      */
     async _extend(blockHash, chainData, prevData) {
         const accountsTx = await this._accounts.transaction();
+
         try {
             await accountsTx.commitBlock(chainData.head, this._transactionCache);
         } catch (e) {
@@ -23917,7 +23704,7 @@ class FullChain extends BaseChain {
             this._proof = null;
         }
 
-        // Update head.
+        // Update head
         this._mainChain = chainData;
         this._headHash = blockHash;
 
@@ -24816,6 +24603,18 @@ class FullConsensusAgent extends BaseConsensusAgent {
         }
     }
 
+    // @UP
+    /**
+     * @param {Hash} hash
+     * @param {DeliberationMessage} message
+     * @returns {Promise.<void>}
+     * @protected
+     */
+    async _processMessage(hash, message) {
+        const result = await this._mempool.pushMessage(message);
+        //TODO: process the Mempool returned code, how they've done in processTransaction or processBlock
+    }
+
     /**
      * @protected
      * @override
@@ -25259,6 +25058,12 @@ class FullConsensus extends BaseConsensus {
         return BaseConsensus.SendTransactionResult.NONE;
     }
 
+    // @UP
+    async sendMessage(msg){
+        const mempoolCode = await this._mempool.pushMessage(msg);
+        //TODO: handle the mempool code switch case
+    }
+
     /**
      * @returns {Array.<Transaction>}
      */
@@ -25266,6 +25071,14 @@ class FullConsensus extends BaseConsensus {
         return this._mempool.getTransactions();
     }
 
+    // @UP
+    /**
+     * @returns {Array.<Transaction>}
+     */
+    getMempoolMessages(){
+        return this._mempool.getMessages();
+    }
+    
     //
     //
 
@@ -28665,6 +28478,7 @@ class Message {
      * @returns {SerialBuffer}
      */
     serialize(buf) {
+        // console.log("serialized of message");
         buf = buf || new SerialBuffer(this.serializedSize);
         // XXX Direct buffer manipulation currently requires this.
         Assert.that(buf.writePos === 0, 'Message.serialize() requires buf.writePos == 0');
@@ -28673,12 +28487,15 @@ class Message {
         buf.writeVarUint(this._type);
         buf.writeUint32(this.serializedSize);
         buf.writeUint32(0); // written later by _setChecksum()
+        // console.log("serialized of message exit");
 
         return buf;
     }
 
     /** @type {number} */
     get serializedSize() {
+        // console.log("inside message serializedSize", SerialBuffer.varUintSize(this._type));
+        
         return /*magic*/ 4
             + /*type*/ SerialBuffer.varUintSize(this._type)
             + /*length*/ 4
@@ -28747,10 +28564,13 @@ Message.Type = {
     MEMPOOL:    9,
     REJECT:     10,
     SUBSCRIBE:  11,
+    MSG:        12,
 
     ADDR:       20,
     GET_ADDR:   21,
     PING:       22,
+    PING2:      25,
+    PING3:      26,
     PONG:       23,
 
     SIGNAL:     30,
@@ -28781,7 +28601,6 @@ Message.Type = {
     VERACK:   90
 };
 Class.register(Message);
-
 class AddrMessage extends Message {
     /**
      * @param {Array.<PeerAddress>} addresses
@@ -29188,6 +29007,11 @@ class InvVector {
         return new InvVector(InvVector.Type.TRANSACTION, hash);
     }
 
+    static fromMessage(message) {
+        const hash = message.hash();        
+        return new InvVector(InvVector.Type.MESSAGE, hash);
+    }
+
     /**
      * @param {InvVector.Type} type
      * @param {Hash} hash
@@ -29218,7 +29042,16 @@ class InvVector {
     serialize(buf) {
         buf = buf || new SerialBuffer(this.serializedSize);
         buf.writeUint32(this._type);
-        this._hash.serialize(buf);
+
+        if(this._hash instanceof Hash){
+            this._hash.serialize(buf);
+        }
+        else{
+            console.log("exitttt");
+            buf = buf || new SerialBuffer(this.serializedSize);
+            buf.write(this.hash);
+        }
+        
         return buf;
     }
 
@@ -29248,8 +29081,15 @@ class InvVector {
 
     /** @type {number} */
     get serializedSize() {
-        return /*invType*/ 4
+        // return /*invType*/ 4
+        //     + this._hash.serializedSize;
+        if(this._hash instanceof Hash){
+            return 4
             + this._hash.serializedSize;
+        }
+        if(vector._hash instanceof Uint8Array){
+            return 4 + this._hash.length
+        }
     }
 
     /** @type {InvVector.Type} */
@@ -29269,6 +29109,7 @@ InvVector.Type = {
     ERROR: 0,
     TRANSACTION: 1,
     BLOCK: 2,
+    MESSAGE: 3,
 
     /**
      * @param {SerialBuffer} buf
@@ -29311,10 +29152,16 @@ class BaseInventoryMessage extends Message {
 
     /** @type {number} */
     get serializedSize() {
-        let size = super.serializedSize
+        let size = super.serializedSize        
             + /*count*/ 2;
         for (const vector of this._vectors) {
-            size += vector.serializedSize;
+            if(vector._hash instanceof Hash){
+                size += vector.serializedSize;
+            }
+            if(vector._hash instanceof Uint8Array){
+                size += vector._hash.length
+            }
+            
         }
         return size;
     }
@@ -29534,6 +29381,123 @@ class PingMessage extends Message {
 }
 Class.register(PingMessage);
 
+class PingMessage2 extends Message {
+    /**
+     * @param {number} nonce
+     */
+    constructor(nonce) {
+        super(Message.Type.PING2);
+        if (!NumberUtils.isUint32(nonce)) throw new Error('Malformed nonce');
+        /** @type {number} */
+        this._nonce = nonce;
+    }
+
+    /**
+     * @param {SerialBuffer} buf
+     * @returns {PingMessage2}
+     */
+    static unserialize(buf) {
+        console.log("unserialize called");
+        Message.unserialize(buf);
+        const nonce = buf.readUint32();
+        return new PingMessage2(nonce);
+    }
+
+    /**
+     * @param {SerialBuffer} [buf]
+     * @returns {SerialBuffer}
+     */
+    serialize(buf) {
+        buf = buf || new SerialBuffer(this.serializedSize);
+        super.serialize(buf);
+        buf.writeUint32(this._nonce);
+        super._setChecksum(buf);
+        console.log("serialize called", buf);
+        return buf;
+    }
+
+    /** @type {number} */
+    get serializedSize() {
+        return super.serializedSize
+            + /*nonce*/ 4;
+    }
+
+    /** @type {number} */
+    get nonce() {
+        return this._nonce;
+    }
+
+    toString() {
+        return `PingMessage2{nonce=${this._nonce}}`;
+    }
+}
+Class.register(PingMessage2);
+
+class PingMessage3 extends Message {
+    /**
+     * @param {Uint32Array} nonce
+     */
+    constructor(nonce) {
+        //for now using a staic data
+        nonce = new Uint32Array([10, 20, 30, 40]);
+        super(Message.Type.PING3);
+        if (!NumberUtils.isUint32Array(nonce)) throw new Error('Malformed Uint32Array');
+        /** @type {number} */
+        this._nonce = nonce;
+        this._length = nonce.length;
+    }
+
+    /**
+     * @param {SerialBuffer} buf
+     * @returns {PingMessage}
+     */
+    static unserialize(buf) {
+        console.log("unserialize called");
+        Message.unserialize(buf);
+        const length = buf.readUint32();
+        // Initialize the Uint32Array based on the length read from the buffer.
+        const uint32Array = new Uint32Array(length);
+        // Read each value from the buffer and store it in the Uint32Array.
+        for (let i = 0; i < length; i++) {
+            uint32Array[i] = buf.readUint32();
+        }
+        return new PingMessage3(uint32Array);
+    }
+
+    /**
+     * @param {SerialBuffer} [buf]
+     * @returns {SerialBuffer}
+     */
+    serialize(buf) {
+        // console.log("serialize called");
+        buf = buf || new SerialBuffer(this.serializedSize);
+        super.serialize(buf);
+        buf.writeUint32(this._length);
+        for (let i = 0; i < this._length; i++) {
+            buf.writeUint32(this._nonce[i]);
+        }
+        super._setChecksum(buf);
+        // console.log("serialized buff", buf)
+        return buf;
+    }
+
+    /** @type {number} */
+    get serializedSize() {
+        return super.serializedSize
+            + /*length*/ 4
+            + /*array*/ 4*this._length;
+    }
+
+    /** @type {number} */
+    get nonce() {
+        return this._nonce;
+    }
+
+    toString() {
+        return `PingMessage3{nonce=${this._nonce}}`;
+    }
+}
+Class.register(PingMessage3);
 class PongMessage extends Message {
     /**
      * @param {number} nonce
@@ -31218,6 +31182,7 @@ MessageFactory.CLASSES[Message.Type.NOT_FOUND] = NotFoundMessage;
 MessageFactory.CLASSES[Message.Type.BLOCK] = BlockMessage;
 MessageFactory.CLASSES[Message.Type.HEADER] = HeaderMessage;
 MessageFactory.CLASSES[Message.Type.TX] = TxMessage;
+MessageFactory.CLASSES[Message.Type.MSG] = DeliMessage;
 MessageFactory.CLASSES[Message.Type.GET_BLOCKS] = GetBlocksMessage;
 MessageFactory.CLASSES[Message.Type.MEMPOOL] = MempoolMessage;
 MessageFactory.CLASSES[Message.Type.REJECT] = RejectMessage;
@@ -31225,6 +31190,8 @@ MessageFactory.CLASSES[Message.Type.SUBSCRIBE] = SubscribeMessage;
 MessageFactory.CLASSES[Message.Type.ADDR] = AddrMessage;
 MessageFactory.CLASSES[Message.Type.GET_ADDR] = GetAddrMessage;
 MessageFactory.CLASSES[Message.Type.PING] = PingMessage;
+MessageFactory.CLASSES[Message.Type.PING2] = PingMessage2;
+MessageFactory.CLASSES[Message.Type.PING3] = PingMessage3;
 MessageFactory.CLASSES[Message.Type.PONG] = PongMessage;
 MessageFactory.CLASSES[Message.Type.SIGNAL] = SignalMessage;
 MessageFactory.CLASSES[Message.Type.GET_CHAIN_PROOF] = GetChainProofMessage;
@@ -35914,6 +35881,14 @@ class PeerChannel extends Observable {
     }
 
     /**
+     * @param {DeliberationMessage} message
+     * @return {boolean}
+    */
+    msg(message) {
+        return this._send(new DeliMessage(message));
+    }
+
+    /**
      * @param {Array.<Hash>} locators
      * @param {number} maxInvSize
      * @param {boolean} [ascending]
@@ -36241,12 +36216,15 @@ PeerChannel.Event[Message.Type.GET_BLOCKS] = 'get-blocks';
 PeerChannel.Event[Message.Type.BLOCK] = 'block';
 PeerChannel.Event[Message.Type.HEADER] = 'header';
 PeerChannel.Event[Message.Type.TX] = 'tx';
+PeerChannel.Event[Message.Type.MSG] = 'msg';
 PeerChannel.Event[Message.Type.MEMPOOL] = 'mempool';
 PeerChannel.Event[Message.Type.REJECT] = 'reject';
 PeerChannel.Event[Message.Type.SUBSCRIBE] = 'subscribe';
 PeerChannel.Event[Message.Type.ADDR] = 'addr';
 PeerChannel.Event[Message.Type.GET_ADDR] = 'get-addr';
 PeerChannel.Event[Message.Type.PING] = 'ping';
+PeerChannel.Event[Message.Type.PING2] = 'ping2';
+PeerChannel.Event[Message.Type.PING3] = 'ping3';
 PeerChannel.Event[Message.Type.PONG] = 'pong';
 PeerChannel.Event[Message.Type.SIGNAL] = 'signal';
 PeerChannel.Event[Message.Type.GET_CHAIN_PROOF] = 'get-chain-proof';
@@ -36743,19 +36721,38 @@ class NetworkAgent extends Observable {
         }
     }
 
+ 
+    // _onPing(msg) {
+    //     // Make sure this is a valid message in our current state.
+    //     if (!this._canAcceptMessage(msg)) {
+    //         return;
+    //     }
+
+    //     // Respond with a pong message
+    //     this._channel.pong(msg.nonce);
+    // }  
+    // @UP
     /**
      * @param {PingMessage} msg
      * @private
-     */
+    */
     _onPing(msg) {
+        // console.log("on ping",msg)
         // Make sure this is a valid message in our current state.
         if (!this._canAcceptMessage(msg)) {
             return;
         }
-
+        if(msg instanceof PingMessage3){
+            //The backpass is not done as this work is just to check
+            //This will basically require the similar kinds of changes on the Pong class
+            this._channel.pong(123);
+        }
+        else{
+            this._channel.pong(msg.nonce);
+        }
         // Respond with a pong message
-        this._channel.pong(msg.nonce);
     }
+
 
     /**
      * @param {PongMessage} msg
@@ -40128,7 +40125,6 @@ class Miner extends Observable {
      * @param {Time} time
      * @param {Address} minerAddress
      * @param {Uint8Array} [extraData=new Uint8Array(0)]
-     *
      * @listens Mempool#transaction-added
      * @listens Mempool#transaction-ready
      */
@@ -40151,7 +40147,6 @@ class Miner extends Observable {
         this._address = minerAddress;
         /** @type {Uint8Array} */
         this._extraData = extraData;
-
         /**
          * Number of hashes computed since the last hashrate update.
          * @type {number}
@@ -40259,9 +40254,11 @@ class Miner extends Observable {
     }
 
     startWork() {
-        if (this.working) {
-            return;
-        }
+        // @UP: I commented these out as these were stopping the interval call to setWork when we did not have txn in mempool.
+        // if (this.working) {
+        //     console.log("about to return from Startwork")
+        //     return;
+        // }
 
         // Initialize hashrate computation.
         this._hashCount = 0;
@@ -40280,11 +40277,36 @@ class Miner extends Observable {
         this._startWork().catch(Log.w.tag(Miner));
     }
 
+    getTimeDifference(unix1, unix2) {
+        // Convert Unix timestamps to milliseconds
+        const date1 = new Date(unix1);
+        const date2 = new Date(unix2);
+    
+        // Calculate the difference in milliseconds
+        const diffInMs = Math.abs(date2 - date1);
+    
+        // Convert to seconds, minutes, hours, or days as needed
+        const diffInSeconds = diffInMs / 1000;
+        const diffInMinutes = diffInSeconds / 60;
+        const diffInHours = diffInMinutes / 60;
+        const diffInDays = diffInHours / 24;
+    
+        return {
+            milliseconds: diffInMs,
+            seconds: diffInSeconds,
+            minutes: diffInMinutes,
+            hours: diffInHours,
+            days: diffInDays,
+        };
+    }
+
     async _startWork() {
+        //@UP: I commented these out as these were stopping the interval call to setWork when we did not have txn in mempool.
         // XXX Needed as long as we cannot unregister from transactions-ready events.
-        if (!this.working || this._restarting) {
-            return;
-        }
+        // if (!this.working || this._restarting) {
+        //     console.log("about to return from _StartWork")
+        //     return;
+        // }
         try {
             this._lastRestart = Date.now();
             this._restarting = true;
@@ -40292,19 +40314,51 @@ class Miner extends Observable {
 
             // Construct next block.
             this._retry = 0;
-            const block = await this.getNextBlock();
-            if (block === null) {
-                this._stopWork();
-                return;
+            //@UP: I added these.
+            const transactionCount = (await (this._mempool.getTransactionsForBlock())).length;
+            const messages = await this._mempool.getMessages();
+            const messageCount = messages.length;
+            console.log("the transcation count in mempool is", transactionCount);
+            if(transactionCount == 0 && messageCount == 0){
+                console.log("There are no txn or msg in the mempool. Will look again in 3 seconds");
+                // return;
+            }
+            else{
+                let before = Date.now();
+                console.log("Time before", before);                
+                const block = await this.getNextBlock();   
+                let after = Date.now();   
+                console.log("Time after", after);
+                console.log("Difference", this.getTimeDifference(after, before));
+                
+                if (block === null) {
+                    this._stopWork();
+                    return;
+                }
+    
+                if (block.isFull()) {
+                    Log.d(Miner, `Starting work on block #${block.header.height} / ${block.minerAddr.toUserFriendlyAddress()} / ${BufferUtils.toBase64(block.body.extraData)} with ${block.transactionCount} transactions (${this._hashrate} H/s)`);
+                } else {
+                    Log.d(Miner, `Starting work on block #${block.header.height} from pool (${this._hashrate} H/s)`);
+                }
+    
+                this._workerPool.startMiningOnBlock(block, this._shareCompactSet ? this._shareCompact : undefined).catch(Log.w.tag(Miner));    
             }
 
-            if (block.isFull()) {
-                Log.d(Miner, `Starting work on block #${block.header.height} / ${block.minerAddr.toUserFriendlyAddress()} / ${BufferUtils.toBase64(block.body.extraData)} with ${block.transactionCount} transactions (${this._hashrate} H/s)`);
-            } else {
-                Log.d(Miner, `Starting work on block #${block.header.height} from pool (${this._hashrate} H/s)`);
-            }
+            // const block = await this.getNextBlock();
+            // if (block === null) {
+            //     this._stopWork();
+            //     return;
+            // }
 
-            this._workerPool.startMiningOnBlock(block, this._shareCompactSet ? this._shareCompact : undefined).catch(Log.w.tag(Miner));
+            // if (block.isFull()) {
+            //     Log.d(Miner, `Starting work on block #${block.header.height} / ${block.minerAddr.toUserFriendlyAddress()} / ${BufferUtils.toBase64(block.body.extraData)} with ${block.transactionCount} transactions (${this._hashrate} H/s)`);
+            // } else {
+            //     Log.d(Miner, `Starting work on block #${block.header.height} from pool (${this._hashrate} H/s)`);
+            // }
+
+            // this._workerPool.startMiningOnBlock(block, this._shareCompactSet ? this._shareCompact : undefined).catch(Log.w.tag(Miner));    
+
         } catch (e) {
             Log.e(Miner, e);
             Log.w(Miner, 'Failed to start work, retrying in 100ms');
@@ -40312,6 +40366,7 @@ class Miner extends Observable {
             setTimeout(() => this.startWork(), 100);
         } finally {
             this._restarting = false;
+            setTimeout(() => this.startWork(), 3000);
         }
     }
 
@@ -40319,16 +40374,62 @@ class Miner extends Observable {
      * @param {{hash: Hash, nonce: number, block: Block}} obj
      */
     async onWorkerShare(obj) {
-        this._hashCount += this._workerPool.noncesPerRun;
+        // console.log("INSIDE onWorkShare", obj);
+        // this._hashCount += this._workerPool.noncesPerRun;
+        // if (obj.block && obj.block.prevHash.equals(this._blockchain.headHash)) {
+        //     console.log("INSIDE onWorkShare -> if");
+        //     Log.d(Miner, () => `Received share: ${obj.nonce} / ${obj.hash.toHex()}`);
+        //     if (!this._submittingBlock) {
+        //         obj.block.header.nonce = obj.nonce;
+
+        //         let blockValid = false;
+        //         if (obj.block.isFull() && BlockUtils.isProofOfWork(obj.hash, obj.block.target)) {
+        //             this._submittingBlock = true;
+        //             if (await obj.block.header.verifyProofOfWork()) {
+        //                 this._numBlocksMined++;
+        //                 blockValid = true;
+
+        //                 // Tell listeners that we've mined a block.
+        //                 this.fire('block-mined', obj.block, this);
+
+        //                 // Push block into blockchain.
+        //                 if ((await this._blockchain.pushBlock(obj.block)) < 0) {
+        //                     console.log("INSIDE if block for workershare");
+        //                     this._submittingBlock = false;
+        //                     this._startWork().catch(Log.w.tag(Miner));
+        //                     return;
+        //                 } else {
+        //                     console.log("INSIDE else block for workershare");
+        //                     this._submittingBlock = false;
+        //                 }
+        //             } else {
+        //                 Log.d(Miner, `Ignoring invalid share: ${await obj.block.header.pow()}`);
+        //             }
+        //         }
+
+        //         this.fire('share', obj.block, blockValid, this);
+        //     }
+        // }
+        // console.log("INSIDE onWorkShare outside -> if");
+
+        // if (this._mempoolChanged && this._lastRestart + Miner.MIN_TIME_ON_BLOCK < Date.now()) {
+        //     console.log("INSIDE onWorkShare last -> if");
+        //     this._startWork().catch(Log.w.tag(Miner));
+        //     console.log("EXITING onWorkShare last -> if");
+        // }
+
+
+        // this._hashCount += this._workerPool.noncesPerRun;
         if (obj.block && obj.block.prevHash.equals(this._blockchain.headHash)) {
             Log.d(Miner, () => `Received share: ${obj.nonce} / ${obj.hash.toHex()}`);
             if (!this._submittingBlock) {
-                obj.block.header.nonce = obj.nonce;
+                // obj.block.header.nonce = obj.nonce;
 
                 let blockValid = false;
-                if (obj.block.isFull() && BlockUtils.isProofOfWork(obj.hash, obj.block.target)) {
+                // if (obj.block.isFull() && BlockUtils.isProofOfWork(obj.hash, obj.block.target)) {
+                if (obj.block.isFull() && BlockUtils.verifyHash(obj.hash, obj.block)) {
                     this._submittingBlock = true;
-                    if (await obj.block.header.verifyProofOfWork()) {
+                    // if (await obj.block.header.verifyProofOfWork()) {
                         this._numBlocksMined++;
                         blockValid = true;
 
@@ -40343,14 +40444,15 @@ class Miner extends Observable {
                         } else {
                             this._submittingBlock = false;
                         }
-                    } else {
-                        Log.d(Miner, `Ignoring invalid share: ${await obj.block.header.pow()}`);
-                    }
+                } else {
+                    Log.d(Miner, `Ignoring invalid share: ${await obj.block.header.pow()}`);
+                }
+                this.fire('share', obj.block, blockValid, this);
                 }
 
-                this.fire('share', obj.block, blockValid, this);
-            }
         }
+        
+
         if (this._mempoolChanged && this._lastRestart + Miner.MIN_TIME_ON_BLOCK < Date.now()) {
             this._startWork().catch(Log.w.tag(Miner));
         }
@@ -40372,13 +40474,18 @@ class Miner extends Observable {
         }
     }
 
+    // @UP
+    async mint(){
+        const emptyBlock = await this.getNextBlock();
+        this._workerPool.startMiningOnBlock(emptyBlock, this._shareCompactSet ? this._shareCompact : undefined).catch(Log.w.tag(Miner));    
+    }
+
     /**
      * @fires Miner#stop
      */
-    stopWork() {
+     stopWork() {
         this._stopWork();
     }
-
     /**
      * @fires Miner#stop
      * @private
@@ -40553,7 +40660,6 @@ class Miner extends Observable {
 Miner.MIN_TIME_ON_BLOCK = 10000;
 Miner.MOVING_AVERAGE_MAX_SIZE = 10;
 Class.register(Miner);
-
 /**
  * @abstract
  * @deprecated
@@ -41740,6 +41846,19 @@ class MinerWorkerPool extends IWorker.Pool(MinerWorker) {
                     }, blockHeader, compact, minNonce, maxNonce, 512);
                 });
             };
+
+            this.justHashHeader = async function (blockHeader){
+                return new Promise(async (resolve, fail) => {
+                    try {
+                        const instance = await CryptoWorker.getInstanceAsync(); 
+                        const hash = await (instance).computeArgon2d(blockHeader);
+                        resolve({hash});
+                    } catch (error) {
+                        fail(error);
+                    }
+                    
+                }); 
+            }
         }
     }
 
@@ -41803,17 +41922,22 @@ class MinerWorkerPool extends IWorker.Pool(MinerWorker) {
      * @param {number} [shareCompact] target of a share, in compact format.
      */
     async startMiningOnBlock(block, shareCompact) {
+        // console.log("4-------startMiner");
         this._block = block;
         this._shareCompact = shareCompact || block.nBits;
         if (!this._miningEnabled) {
-            await this._updateToSize();
-            this._activeNonces = [];
+            // console.log("4-------startMiner");
+            // await this._updateToSize();
+            // this._activeNonces = [];
             this._miningEnabled = true;
-            for (let i = 0; i < this.poolSize; ++i) {
+            //@UP: I changed this
+            // for (let i = 0; i < this.poolSize; ++i) {
+            for (let i = 0; i < 1; ++i) {
+                // console.log("4-------startMiner");
                 this._startMiner();
             }
         } else {
-            this._activeNonces = [{minNonce:0, maxNonce:0}];
+            // this._activeNonces = [{minNonce:0, maxNonce:0}];
         }
     }
 
@@ -41826,21 +41950,31 @@ class MinerWorkerPool extends IWorker.Pool(MinerWorker) {
             await this._superUpdateToSize.call(this);
         }
 
+        // console.log("4.1------------_updateToSizeBeforeWhile");
+        let i = 1;
         while (this._miningEnabled && this._activeNonces.length < this.poolSize) {
+            // console.log("4.2------------whilelooping i times===", i);
             this._startMiner();
+            i++;
         }
+        // console.log("4.3------------_updateToSizeAfterWhile");
+
     }
 
     _startMiner() {
-        if (this._activeNonces.length >= this.poolSize) {
-            return;
-        }
+        // console.log("5------------Inside _startMiner");
 
-        const minNonce = this._activeNonces.length === 0 ? 0 : Math.max.apply(null, this._activeNonces.map((a) => a.maxNonce));
-        const maxNonce = minNonce + this._noncesPerRun;
-        const nonceRange = {minNonce, maxNonce};
-        this._activeNonces.push(nonceRange);
-        this._singleMiner(nonceRange).catch((e) => Log.e(MinerWorkerPool, e));
+        // if (this._activeNonces.length >= this.poolSize) {
+        //     return;
+        // }
+
+        // const minNonce = this._activeNonces.length === 0 ? 0 : Math.max.apply(null, this._activeNonces.map((a) => a.maxNonce));
+        // const maxNonce = minNonce + this._noncesPerRun;
+        // const nonceRange = {minNonce, maxNonce};
+        // this._activeNonces.push(nonceRange);
+        this._singleMiner().catch((e) => Log.e(MinerWorkerPool, e));
+        // console.log("6------------Exiting _startMiner");
+
     }
 
     /**
@@ -41848,37 +41982,84 @@ class MinerWorkerPool extends IWorker.Pool(MinerWorker) {
      * @return {Promise.<void>}
      * @private
      */
-    async _singleMiner(nonceRange) {
+    async _singleMiner() {
+        // console.log("7------------Inside _singleMiner");
         let i = 0;
-        while (this._miningEnabled && (IWorker.areWorkersAsync || PlatformUtils.isNodeJs() || i === 0) && i < this._runsPerCycle) {
-            i++;
-            const block = this._block;
-            const result = await this.multiMine(block.header.serialize(), this._shareCompact, nonceRange.minNonce, nonceRange.maxNonce);
-            if (result) {
-                const hash = new Hash(result.hash);
-                this._observable.fire('share', {
-                    block,
-                    nonce: result.nonce,
-                    hash
-                });
-            } else {
-                this._observable.fire('no-share', {
-                    nonce: nonceRange.maxNonce
-                });
-            }
-            if (this._activeNonces.length > this.poolSize) {
-                this._activeNonces.splice(this._activeNonces.indexOf(nonceRange), 1);
-                return;
-            } else {
-                const newMin = Math.max.apply(null, this._activeNonces.map((a) => a.maxNonce));
-                const newRange = {minNonce: newMin, maxNonce: newMin + this._noncesPerRun};
-                this._activeNonces.splice(this._activeNonces.indexOf(nonceRange), 1, newRange);
-                nonceRange = newRange;
-            }
+        //@UP: I made the loop finite as i need it to run only once, since there will be no hashing so no need to run a loop at all
+        // while (this._miningEnabled && (IWorker.areWorkersAsync || PlatformUtils.isNodeJs() || i === 0) && i < this._runsPerCycle) {
+        // while (this._miningEnabled && (IWorker.areWorkersAsync || PlatformUtils.isNodeJs() || i === 0) && i < 100) {
+        //     i++;
+        //     const block = this._block;
+        //     const result = await this.multiMine(block.header.serialize(), this._shareCompact, nonceRange.minNonce, nonceRange.maxNonce);
+        //     // console.log("7.1------result is", result);
+        //     if (result) {
+        //         // console.log("7.2------inside result");
+        //         const hash = new Hash(result.hash);
+        //         this._observable.fire('share', {
+        //             block,
+        //             nonce: result.nonce,
+        //             hash
+        //         });
+        //     } else {
+        //         // console.log("7.3------inside result else");
+        //         this._observable.fire('no-share', {
+        //             nonce: nonceRange.maxNonce
+        //         });
+        //     }
+        //     // console.log("7.4--------outside IFELSE", this._activeNonces.length ,  this.poolSize);
+        //     if (this._activeNonces.length > this.poolSize) {
+        //         console.log("7.5------inside IF");
+        //         this._activeNonces.splice(this._activeNonces.indexOf(nonceRange), 1);
+        //         return;
+        //     } else {
+        //         // console.log("7.6------inside ELSE");
+        //         const newMin = Math.max.apply(null, this._activeNonces.map((a) => a.maxNonce));
+        //         const newRange = {minNonce: newMin, maxNonce: newMin + this._noncesPerRun};
+        //         // console.log("New range before splice", newRange);
+        //         this._activeNonces.splice(this._activeNonces.indexOf(nonceRange), 1, newRange);
+        //         nonceRange = newRange;
+        //         // console.log("New range after splice", newRange);
+        //     }
+        // }
+
+        //@UP Don't need to loop or hash as this is not PoW so remove them
+        const block = this._block;
+        const result = await this.justHashHeader(block.header.serialize());
+        // console.log("7.1------result is", result);
+        if (result) {
+            const hash = new Hash(result.hash);
+            this._observable.fire('share', {
+                block,
+                hash
+            });
+        } else {
+            // TODO: can remove the else block as this should never be the case!
+            // this._observable.fire('no-share', {
+            //     nonce: nonceRange.maxNonce
+            // });
         }
-        if (this._miningEnabled) {
-            setTimeout(() => this._singleMiner(nonceRange), this._cycleWait);
-        }
+        //@UP the things below update the nonce, don't need this as well.
+        // console.log("7.4--------outside IFELSE", this._activeNonces.length ,  this.poolSize);
+        // if (this._activeNonces.length > this.poolSize) {
+        //     console.log("7.5------inside IF");
+        //     this._activeNonces.splice(this._activeNonces.indexOf(nonceRange), 1);
+        //     return;
+        // } else {
+        //     // console.log("7.6------inside ELSE");
+        //     const newMin = Math.max.apply(null, this._activeNonces.map((a) => a.maxNonce));
+        //     const newRange = {minNonce: newMin, maxNonce: newMin + this._noncesPerRun};
+        //     // console.log("New range before splice", newRange);
+        //     this._activeNonces.splice(this._activeNonces.indexOf(nonceRange), 1, newRange);
+        //     nonceRange = newRange;
+        //     // console.log("New range after splice", newRange);
+        // }
+        
+        //@UP once we run it we dont need to keep caling it or keep the single miner going so we can remove this.
+        // console.log("Exit while of sinlgeMiner");
+        // if (this._miningEnabled) {
+        //     setTimeout(() => this._singleMiner(nonceRange), this._cycleWait);
+        // }
+        this.stop();
     }
 }
 
@@ -42747,6 +42928,15 @@ class Client {
         return new Client.TransactionDetails(tx, Client.TransactionState.NEW);
     }
 
+    async sendMessage(message){
+        let address = await this._network.getOwnAddress()        
+        let msg = new DeliberationMessage(message, address._address._publicKey, Math.floor(Date.now()/1000));        
+        msg.encodeMessage()
+        const consensus = await this._consensus;
+        let consensusResult = await consensus.sendMessage(msg);
+        //TODO: @UP handle the switch cases as handled above in sendTransaction
+    }
+
     /**
      * @param {BlockListener} listener
      * @return {Promise.<Handle>}
@@ -43206,6 +43396,13 @@ Client.Mempool = class Mempool {
     async getStatistics() {
         const consensus = await this._client._consensus;
         return new Client.MempoolStatistics(consensus.getMempoolContents());
+    }
+
+    //  @UP
+    async getMessageCount() {
+        const consensus = await this._client._consensus;
+        const messages = consensus.getMempoolMessages();
+        return messages.length;
     }
 
     /**

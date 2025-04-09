@@ -26,6 +26,16 @@ class NumberUtils {
             && val >= 0 && val <= NumberUtils.UINT32_MAX;
     }
 
+    // @UP
+    /**
+     * @param {Array<unknown>} vals
+     * @return {boolean}
+     */
+     static isUint32Array(vals) {
+        // Ensure vals is an array and every element passes the isUint32 check
+        return vals instanceof Uint32Array && vals.every(val => NumberUtils.isUint32(val));
+    }
+
     /**
      * @param {unknown} val
      * @return {boolean}

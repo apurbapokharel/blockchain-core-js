@@ -20,7 +20,8 @@ class BlockBody {
     constructor(minerAddr, transactions, extraData = new Uint8Array(0), prunedAccounts = []) {
         if (!(minerAddr instanceof Address)) throw new Error('Malformed minerAddr');
         if (!Array.isArray(transactions) || transactions.some(it => !(it instanceof Transaction))) throw new Error('Malformed transactions');
-        if (!(extraData instanceof Uint8Array) || !NumberUtils.isUint8(extraData.byteLength)) throw new Error('Malformed extraData');
+        // @UP changed from !NumberUtils.isUint8(extraData.byteLength)
+        if (!(extraData instanceof Uint8Array) || !NumberUtils.isUint32(extraData.byteLength)) throw new Error('Malformed extraData');
 
         /** @type {Address} */
         this._minerAddr = minerAddr;
@@ -40,7 +41,8 @@ class BlockBody {
      */
     static unserialize(buf) {
         const minerAddr = Address.unserialize(buf);
-        const extraDataLength = buf.readUint8();
+        //@UP changed from buf.readUint8();
+        const extraDataLength = buf.readUint32();
         const extraData = buf.read(extraDataLength);
         const numTransactions = buf.readUint16();
         const transactions = new Array(numTransactions);
@@ -62,7 +64,8 @@ class BlockBody {
     serialize(buf) {
         buf = buf || new SerialBuffer(this.serializedSize);
         this._minerAddr.serialize(buf);
-        buf.writeUint8(this._extraData.byteLength);
+        //@UP changed from buf.writeUint8(this._extraData.byteLength);
+        buf.writeUint32(this._extraData.byteLength);
         buf.write(this._extraData);
         buf.writeUint16(this._transactions.length);
         for (const tx of this._transactions) {
@@ -80,7 +83,8 @@ class BlockBody {
      */
     get serializedSize() {
         let size = this._minerAddr.serializedSize
-            + /*extraDataLength*/ 1
+            //@UP changed from 1 to 4
+            + /*extraDataLength*/ 4
             + this._extraData.byteLength
             + /*transactionsLength*/ 2
             + /*prunedAccountsLength*/ 2;

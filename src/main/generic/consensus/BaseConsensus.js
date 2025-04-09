@@ -50,6 +50,7 @@ class BaseConsensus extends Observable {
         // Relay new (verified) transactions to peers.
         this._onToDisconnect(mempool,'transaction-added', tx => this._onTransactionAdded(tx));
         this._onToDisconnect(mempool,'transaction-removed', tx => this._onTransactionRemoved(tx));
+        this._onToDisconnect(mempool,'message-added', msg => this._onMessageAdded(msg));
     }
 
     //
@@ -216,6 +217,14 @@ class BaseConsensus extends Observable {
      * @returns {Array.<Transaction>}
      */
     getMempoolContents() {
+        return [];
+    }
+
+    //@UP
+    /**
+     * @returns {Array.<Transaction>}
+     */
+     getMempoolMessages(){
         return [];
     }
 
@@ -666,6 +675,16 @@ class BaseConsensus extends Observable {
         }
     }
 
+    _onMessageAdded(msg){
+        // this.fire('message-added', msg)
+        // Don't relay message if we are not synced yet.
+        if (!this._established) return;
+
+        for (const agent of this._agents.valueIterator()) {
+            agent.relayMessage(msg);
+        }
+    }
+    
     /**
      * @param {Transaction} tx
      * @protected

@@ -75,16 +75,13 @@ class FullChain extends BaseChain {
             if (!genesis || !genesis.onMainChain) {
                 throw new Error('Invalid genesis block stored. Reset your consensus database.');
             }
-
             // Load main chain from store.
             this._mainChain = await this._store.getChainData(this._headHash, /*includeBody*/ true);
             Assert.that(!!this._mainChain, 'Failed to load main chain from storage');
-
             // Check that chain/accounts state is consistent.
             if (!this._mainChain.head.accountsHash.equals(await this._accounts.hash())) {
                 throw new Error('Corrupted store: Inconsistent chain/accounts state');
             }
-
             // Initialize TransactionCache.
             const blocks = await this._store.getBlocksBackward(this.headHash, this._transactionCache.missingBlocks - 1, /*includeBody*/ true);
             this._transactionCache.prependBlocks([...blocks.reverse(), this._mainChain.head]);
@@ -92,7 +89,6 @@ class FullChain extends BaseChain {
             // Initialize chain & accounts with Genesis block.
             this._mainChain = await ChainData.initial(GenesisConfig.GENESIS_BLOCK);
             this._headHash = GenesisConfig.GENESIS_HASH;
-
             const tx = this._store.synchronousTransaction();
             tx.putChainDataSync(GenesisConfig.GENESIS_HASH, this._mainChain);
             tx.setHeadSync(GenesisConfig.GENESIS_HASH);
@@ -158,13 +154,14 @@ class FullChain extends BaseChain {
         }
 
         // Check that the difficulty is correct.
-        const nextTarget = await this.getNextTarget(predecessor);
-        Assert.that(BlockUtils.isValidTarget(nextTarget), 'Failed to compute next target in FullChain');
-        if (block.nBits !== BlockUtils.targetToCompact(nextTarget)) {
-            Log.w(FullChain, 'Rejecting block - difficulty mismatch');
-            this._blockInvalidCount++;
-            return FullChain.ERR_INVALID;
-        }
+        // @UP: nothing to do with difficulty now so remove it
+        // const nextTarget = await this.getNextTarget(predecessor);
+        // Assert.that(BlockUtils.isValidTarget(nextTarget), 'Failed to compute next target in FullChain');
+        // if (block.nBits !== BlockUtils.targetToCompact(nextTarget)) {
+        //     Log.w(FullChain, 'Rejecting block - difficulty mismatch');
+        //     this._blockInvalidCount++;
+        //     return FullChain.ERR_INVALID;
+        // }
 
         // Block looks good, create ChainData.
         const chainData = await prevData.nextChainData(block);
@@ -226,6 +223,7 @@ class FullChain extends BaseChain {
      */
     async _extend(blockHash, chainData, prevData) {
         const accountsTx = await this._accounts.transaction();
+
         try {
             await accountsTx.commitBlock(chainData.head, this._transactionCache);
         } catch (e) {
@@ -265,7 +263,7 @@ class FullChain extends BaseChain {
             this._proof = null;
         }
 
-        // Update head.
+        // Update head
         this._mainChain = chainData;
         this._headHash = blockHash;
 

@@ -195,9 +195,10 @@ class CryptoWorkerImpl extends IWorker.Stub(CryptoWorker) {
 
         const valid = await block._verify(timeNow);
         const pow = await block.header.pow();
-        const interlinkHash = block.interlink.hash();
+        // UP: const interlinkHash = block.interlink.hash();
         const bodyHash = block.body.hash();
-        return { valid: valid, pow: pow.serialize(), interlinkHash: interlinkHash.serialize(), bodyHash: bodyHash.serialize() };
+        // UP: return { valid: valid, pow: pow.serialize(), interlinkHash: interlinkHash.serialize(), bodyHash: bodyHash.serialize() };
+        return { valid: valid, pow: pow.serialize(), bodyHash: bodyHash.serialize() };
     }
 }
 

@@ -34,6 +34,15 @@ class BaseConsensusAgent extends Observable {
             BaseConsensusAgent.TRANSACTIONS_PER_SECOND + BaseConsensusAgent.FREE_TRANSACTIONS_PER_SECOND,
             1000, BaseConsensusAgent.REQUEST_TRANSACTIONS_WAITING_MAX);
 
+        //@UP: making this the same as txn as we want msg to be passed with the same 
+        // frequency as transaction are passsed.
+        // The above reasoning may or may not be the case, an intutive guess
+
+        this._msgsToRequest = new ThrottledQueue(
+            BaseConsensusAgent.TRANSACTIONS_AT_ONCE + BaseConsensusAgent.FREE_TRANSACTIONS_AT_ONCE,
+            BaseConsensusAgent.TRANSACTIONS_PER_SECOND + BaseConsensusAgent.FREE_TRANSACTIONS_PER_SECOND,
+            1000, BaseConsensusAgent.REQUEST_TRANSACTIONS_WAITING_MAX);
+        
         // Objects that are currently being requested from the peer.
         /** @type {HashSet.<InvVector>} */
         this._objectsInFlight = new HashSet();
@@ -103,6 +112,7 @@ class BaseConsensusAgent extends Observable {
         this._onToDisconnect(peer.channel, 'block', msg => this._onBlock(msg));
         this._onToDisconnect(peer.channel, 'header', msg => this._onHeader(msg));
         this._onToDisconnect(peer.channel, 'tx', msg => this._onTx(msg));
+        this._onToDisconnect(peer.channel, 'msg', msg => this._onMsg(msg));
         this._onToDisconnect(peer.channel, 'not-found', msg => this._onNotFound(msg));
 
         this._onToDisconnect(peer.channel, 'subscribe', msg => this._onSubscribe(msg));
@@ -114,6 +124,7 @@ class BaseConsensusAgent extends Observable {
         this._onToDisconnect(peer.channel, 'transaction-receipts', msg => this._onTransactionReceipts(msg));
 
         this._onToDisconnect(peer.channel, 'mempool', msg => this._onMempool(msg));
+        // this._onToDisconnect(peer.channel, 'mempool', msg => this.sendMessage(msg));
 
         this._onToDisconnect(peer.channel, 'get-head', msg => this._onGetHead(msg));
         this._onToDisconnect(peer.channel, 'head', msg => this._onHead(msg));
@@ -203,6 +214,7 @@ class BaseConsensusAgent extends Observable {
      * @returns {boolean}
      */
     relayBlock(block) {
+        // console.log("realy block called", block);
         // Don't relay block if have not synced with the peer yet.
         if (!this._synced) {
             return false;
@@ -215,6 +227,8 @@ class BaseConsensusAgent extends Observable {
 
         // Create InvVector.
         const vector = InvVector.fromBlock(block);
+
+        // console.log("realy block, block inv vector", vector);
 
         // Don't relay block to this peer if it already knows it.
         if (this._knownObjects.contains(vector)) {
@@ -235,92 +249,11 @@ class BaseConsensusAgent extends Observable {
     }
 
     /**
-     * @param {Hash} hash
-     * @return {Promise.<?Block>}
-     */
-    requestBlock(hash) {
-        return new Promise((resolve, reject) => {
-            const vector = new InvVector(InvVector.Type.BLOCK, hash);
-            if (this._pendingRequests.contains(vector)) {
-                this._pendingRequests.get(vector).push({resolve, reject});
-            } else {
-                this._pendingRequests.put(vector, [{resolve, reject}]);
-
-                this._peer.channel.getData([vector]);
-
-                this._timers.setTimeout(`block-request-${vector.hash.toBase64()}`, () => {
-                    const requests = this._pendingRequests.get(vector);
-                    if (!requests) return;
-
-                    this._pendingRequests.remove(vector);
-
-                    for (const {reject} of requests) {
-                        reject(new Error('Timeout'));
-                    }
-                }, BaseConsensusAgent.REQUEST_TIMEOUT);
-            }
-        });
-    }
-
-    /**
-     * @param {Hash} hash
-     * @return {Promise.<?Transaction>}
-     */
-    requestTransaction(hash) {
-        return new Promise((resolve, reject) => {
-            const vector = new InvVector(InvVector.Type.TRANSACTION, hash);
-            if (this._pendingRequests.contains(vector)) {
-                this._pendingRequests.get(vector).push({resolve, reject});
-            } else {
-                this._pendingRequests.put(vector, [{resolve, reject}]);
-
-                if (!this._objectsInFlight.contains(vector)) {
-                    this._peer.channel.getData([vector]);
-                    this._objectsInFlight.add(vector);
-                }
-
-                this._timers.setTimeout(`tx-request-${vector.hash.toBase64()}`, () => {
-                    const requests = this._pendingRequests.get(vector);
-                    if (!requests) return;
-
-                    this._pendingRequests.remove(vector);
-
-                    for (const {reject} of requests) {
-                        reject(new Error('Timeout'));
-                    }
-                }, BaseConsensusAgent.REQUEST_TIMEOUT);
-            }
-        });
-    }
-
-    _sendWaitingInvVectors() {
-        const invVectors = this._waitingInvVectors.dequeueMulti(BaseInventoryMessage.VECTORS_MAX_COUNT);
-        if (invVectors.length > 0) {
-            this._peer.channel.inv(invVectors);
-            Log.v(BaseConsensusAgent, () => `[INV] Sent ${invVectors.length} vectors to ${this._peer.peerAddress}`);
-        }
-    }
-
-    _sendFreeWaitingInvVectors() {
-        const invVectors = [];
-        let size = 0;
-        while (invVectors.length < BaseInventoryMessage.VECTORS_MAX_COUNT && this._waitingFreeInvVectors.isAvailable()
-            && size < BaseConsensusAgent.FREE_TRANSACTION_SIZE_PER_INTERVAL) {
-            const freeTransaction = this._waitingFreeInvVectors.dequeue();
-            invVectors.push(freeTransaction.inv);
-            size += freeTransaction.serializedSize;
-        }
-        if (invVectors.length > 0) {
-            this._peer.channel.inv(invVectors);
-            Log.v(BaseConsensusAgent, () => `[INV] Sent ${invVectors.length} vectors to ${this._peer.peerAddress}`);
-        }
-    }
-
-    /**
      * @param {Transaction} transaction
      * @return {boolean}
      */
     relayTransaction(transaction) {
+        // console.log("realy transaction called");
         // Only relay transaction if it matches the peer's subscription.
         if (!this._remoteSubscription.matchesTransaction(transaction)) {
             Log.v(BaseConsensusAgent, `Not sending ${transaction.hash()} to ${this.peer.peerAddress}: not subscribed`);
@@ -354,10 +287,128 @@ class BaseConsensusAgent extends Observable {
         return true;
     }
 
+    relayMessage(message) {
+        // console.log("relay message");
+        // @UP: Dont know what this means but; Only relay message if it matches the peer's subscription.
+        
+        const vector = InvVector.fromMessage(message);
+
+        // Don't relay message to this peer if it already knows it.
+        if (this._knownObjects.contains(vector)) {
+            Log.v(BaseConsensusAgent, `Not sending ${message.hash()} to ${this.peer.peerAddress}: already knows`);
+            return false;
+        }
+
+        // Relay transaction to peer later.
+        const serializedSize = message.serializedSize;
+        // APU: we can send it as a freeInvVector later
+        this._waitingInvVectors.enqueue(vector);
+
+        // Assume that the peer knows this message after short time.
+        this._timers.setTimeout(`knows-tx-${vector.hash.toBase64()}`, () => {
+            this._knownObjects.add(vector);
+        }, BaseConsensusAgent.KNOWS_OBJECT_AFTER_INV_DELAY);
+
+        Log.v(BaseConsensusAgent, `Sending ${message.hash()} to ${this.peer.peerAddress}`);
+
+        return true;
+    }
+
+
+    /**
+     * @param {Hash} hash
+     * @return {Promise.<?Block>}
+     */
+    requestBlock(hash) {
+        // console.log("request bkock called", hash);
+        return new Promise((resolve, reject) => {
+            const vector = new InvVector(InvVector.Type.BLOCK, hash);
+            if (this._pendingRequests.contains(vector)) {
+                this._pendingRequests.get(vector).push({resolve, reject});
+            } else {
+                this._pendingRequests.put(vector, [{resolve, reject}]);
+
+                this._peer.channel.getData([vector]);
+
+                this._timers.setTimeout(`block-request-${vector.hash.toBase64()}`, () => {
+                    const requests = this._pendingRequests.get(vector);
+                    if (!requests) return;
+
+                    this._pendingRequests.remove(vector);
+
+                    for (const {reject} of requests) {
+                        reject(new Error('Timeout'));
+                    }
+                }, BaseConsensusAgent.REQUEST_TIMEOUT);
+            }
+        });
+    }
+
+    /**
+     * @param {Hash} hash
+     * @return {Promise.<?Transaction>}
+     */
+    requestTransaction(hash) {
+        // console.log("request txn called", hash);
+        return new Promise((resolve, reject) => {
+            const vector = new InvVector(InvVector.Type.TRANSACTION, hash);
+            if (this._pendingRequests.contains(vector)) {
+                this._pendingRequests.get(vector).push({resolve, reject});
+            } else {
+                this._pendingRequests.put(vector, [{resolve, reject}]);
+
+                if (!this._objectsInFlight.contains(vector)) {
+                    this._peer.channel.getData([vector]);
+                    this._objectsInFlight.add(vector);
+                }
+
+                this._timers.setTimeout(`tx-request-${vector.hash.toBase64()}`, () => {
+                    const requests = this._pendingRequests.get(vector);
+                    if (!requests) return;
+
+                    this._pendingRequests.remove(vector);
+
+                    for (const {reject} of requests) {
+                        reject(new Error('Timeout'));
+                    }
+                }, BaseConsensusAgent.REQUEST_TIMEOUT);
+            }
+        });
+    }
+
+    // @UP FIXME: Request message missing 
+
+    _sendWaitingInvVectors() {
+        const invVectors = this._waitingInvVectors.dequeueMulti(BaseInventoryMessage.VECTORS_MAX_COUNT);
+        if (invVectors.length > 0) {
+            // console.log("waiting inv vector called");
+            this._peer.channel.inv(invVectors);
+            Log.v(BaseConsensusAgent, () => `[INV] Sent ${invVectors.length} vectors to ${this._peer.peerAddress}`);
+        }
+    }
+
+    _sendFreeWaitingInvVectors() {
+        // console.log("_sendFreeWaitingInvVectors called");
+        const invVectors = [];
+        let size = 0;
+        while (invVectors.length < BaseInventoryMessage.VECTORS_MAX_COUNT && this._waitingFreeInvVectors.isAvailable()
+            && size < BaseConsensusAgent.FREE_TRANSACTION_SIZE_PER_INTERVAL) {
+            const freeTransaction = this._waitingFreeInvVectors.dequeue();
+            invVectors.push(freeTransaction.inv);
+            size += freeTransaction.serializedSize;
+        }
+        if (invVectors.length > 0) {
+            // console.log("waiting free inv vector called");
+            this._peer.channel.inv(invVectors);
+            Log.v(BaseConsensusAgent, () => `[INV] Sent ${invVectors.length} vectors to ${this._peer.peerAddress}`);
+        }
+    }
+
     /**
      * @param {Transaction} transaction
      */
     removeTransaction(transaction) {
+        // console.log("remove transation called");
         // Create InvVector.
         const vector = InvVector.fromTransaction(transaction);
 
@@ -366,11 +417,14 @@ class BaseConsensusAgent extends Observable {
         this._waitingInvVectors.remove(vector);
     }
 
+    // @UP FIXME: removeMessage needed? i remove messaged from mempool once _evicttransactions are called but this could be a better way 
+
     /**
      * @param {Hash} blockHash
      * @returns {boolean}
      */
     knowsBlock(blockHash) {
+        // console.log("knowsBlock called", blockHash);
         const vector = new InvVector(InvVector.Type.BLOCK, blockHash);
         return this._knownObjects.contains(vector);
     }
@@ -380,6 +434,7 @@ class BaseConsensusAgent extends Observable {
      * @returns {boolean}
      */
     knowsTransaction(txHash) {
+        // console.log("knowsTxn called", txHash);
         const vector = new InvVector(InvVector.Type.TRANSACTION, txHash);
         return this._knownObjects.contains(vector);
     }
@@ -398,6 +453,7 @@ class BaseConsensusAgent extends Observable {
      * @private
      */
     async _onMempool(msg) {
+
         // Query mempool for transactions
         const transactions = this._getSubscribedMempoolTransactions();
 
@@ -434,6 +490,7 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     _onInv(msg) {
+        // console.log("_onInv 1 called", msg);
         return this._synchronizer.push('onInv',
             this.__onInv.bind(this, msg));
     }
@@ -444,6 +501,17 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     async __onInv(msg) {
+        // console.trace();
+        /**
+         * OnInv binds the functions and calls MultiSynchronizer push
+         * MultiSynchronizer push calls syncronizer push
+         * Synchronizer calls _doWork
+         * doWork callls the binded function __onInv
+         */
+        // console.log("_onInv 2 called");
+        // console.log(this._knownObjects);
+        // console.log(this._waitingInvVectors);
+        // console.log(this._waitingFreeInvVectors);
         // Keep track of the objects the peer knows.
         for (const vector of msg.vectors) {
             this._knownObjects.add(vector);
@@ -455,6 +523,7 @@ class BaseConsensusAgent extends Observable {
         // Request unknown objects, ignore known ones.
         const unknownBlocks = [];
         const unknownTxs = [];
+        const unknownMsgs = [];
         for (const vector of msg.vectors) {
             // Ignore objects that we are currently requesting / processing.
             if (this._objectsInFlight.contains(vector) || this._objectsProcessing.contains(vector)) {
@@ -487,18 +556,32 @@ class BaseConsensusAgent extends Observable {
                     }
                     break;
                 }
+                case InvVector.Type.MESSAGE: {
+                    const message = this._getMessage(vector.hash);
+                    // console.log("hash inside case",vector.hash, message);
+                    if (!message) {
+                        unknownMsgs.push(vector);
+                        this._onNewMessageAnnounced(vector.hash);
+                    } else {
+                        this._onKnownMessageAnnounced(vector.hash, message);
+                    }
+                    break;
+                }
                 default:
                     // ignore
             }
         }
 
-        Log.v(BaseConsensusAgent, () => `[INV] ${msg.vectors.length} vectors (${unknownBlocks.length} new blocks, ${unknownTxs.length} new txs) received from ${this._peer.peerAddress}`);
+        Log.v(BaseConsensusAgent, () => `[INV] ${msg.vectors.length} vectors (${unknownBlocks.length} new blocks, ${unknownTxs.length} new txs, ${unknownMsgs.length} new msgs) received from ${this._peer.peerAddress}`);
 
-        if (unknownBlocks.length > 0 || unknownTxs.length > 0) {
+        if (unknownBlocks.length > 0 || unknownTxs.length > 0 || unknownMsgs.length > 0) {
             for (const vector of unknownBlocks) {
                 this._invRequestManager.askToRequestVector(this, vector);
             }
             for (const vector of unknownTxs) {
+                this._invRequestManager.askToRequestVector(this, vector);
+            }
+            for (const vector of unknownMsgs) {
                 this._invRequestManager.askToRequestVector(this, vector);
             }
         } else {
@@ -510,15 +593,18 @@ class BaseConsensusAgent extends Observable {
      * @param {...InvVector} vector
      */
     requestVector(...vector) {
+        // console.log("vector requested");
+
         // Store unknown vectors in objectsToRequest.
         this._blocksToRequest.enqueueAll(vector.filter(v => v.type === InvVector.Type.BLOCK));
         this._txsToRequest.enqueueAll(vector.filter(v => v.type === InvVector.Type.TRANSACTION));
+        this._msgsToRequest.enqueueAll(vector.filter(v => v.type === InvVector.Type.MESSAGE));
 
         // Clear the request throttle timeout.
         this._timers.clearTimeout('inv');
 
         // If there are enough objects queued up, send out a getData request.
-        if (this._blocksToRequest.length + this._txsToRequest.available >= BaseConsensusAgent.REQUEST_THRESHOLD) {
+        if (this._blocksToRequest.length + this._txsToRequest.available + this._msgsToRequest.available >= BaseConsensusAgent.REQUEST_THRESHOLD) {
             this._requestData();
         }
         // Otherwise, wait a short time for more inv messages to arrive, then request.
@@ -574,6 +660,17 @@ class BaseConsensusAgent extends Observable {
 
     /**
      * @param {Hash} hash
+     * @returns {?DeliberationMessage}
+     * @protected
+     * @abstract
+     */
+    _getMessage(hash) {
+        // MUST be implemented by subclasses.
+        throw new Error('not implemented');
+    }
+
+    /**
+     * @param {Hash} hash
      * @returns {void}
      * @protected
      */
@@ -604,22 +701,41 @@ class BaseConsensusAgent extends Observable {
     }
 
     /**
+    * @param {Hash} hash
+    * @returns {void}
+    * @protected
+    */
+   _onNewMessageAnnounced(hash) {
+   }
+
+   /**
+    * @param {Hash} hash
+    * @param {DeliberationMessage} message
+    * @returns {void}
+    * @protected
+    */
+   _onKnownMessageAnnounced(hash, message) {
+   }
+
+    /**
      * @returns {void}
      * @protected
      */
     _requestData() {
+        // console.log("data requested");
         // Only one request at a time.
         if (!this._objectsInFlight.isEmpty()) return;
 
         // Don't do anything if there are no objects queued to request.
-        if (this._blocksToRequest.isEmpty() && !this._txsToRequest.isAvailable()) return;
-
+        if (this._blocksToRequest.isEmpty() && !this._txsToRequest.isAvailable() && !this._msgsToRequest.isAvailable()) return;
+        // console.log("after");
         // Request queued objects from the peer. Only request up to VECTORS_MAX_COUNT objects at a time.
         const vectorsMaxCount = BaseInventoryMessage.VECTORS_MAX_COUNT;
         /** @type {Array.<InvVector>} */
         let vectors = this._blocksToRequest.dequeueMulti(vectorsMaxCount);
         if (vectors.length < vectorsMaxCount) {
             vectors = vectors.concat(this._txsToRequest.dequeueMulti(vectorsMaxCount - vectors.length));
+            vectors = vectors.concat(this._msgsToRequest.dequeueMulti(vectorsMaxCount - vectors.length));
         }
 
         // Mark the requested objects as in-flight.
@@ -638,22 +754,31 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     _doRequestData(vectors) {
+        // console.log("do request data");
+
         if (this._willRequestHeaders()) {
             /** @type {Array.<InvVector>} */
             const blocks = [];
             /** @type {Array.<InvVector>} */
             const transactions = [];
+            /** @type {Array.<InvVector>} */
+            const messages = [];
             for (const vector of vectors) {
                 if (vector.type === InvVector.Type.BLOCK) {
                     blocks.push(vector);
-                } else {
+                } 
+                else if(vector.type === InvVector.Type.TRANSACTION) {
                     transactions.push(vector);
+                }
+                else{
+                    messages.push(vector);
                 }
             }
 
             // Request headers and transactions from peer.
             this._peer.channel.getHeader(blocks);
             this._peer.channel.getData(transactions);
+            this._peer.channel.getData(messages);
         } else {
             this._peer.channel.getData(vectors);
         }
@@ -669,6 +794,8 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     async _onBlock(msg) {
+        // console.log("on block called");
+
         const hash = msg.block.hash();
         const vector = new InvVector(InvVector.Type.BLOCK, hash);
         const blockRequest = this._pendingRequests.get(vector);
@@ -736,6 +863,7 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     async _onHeader(msg) {
+        // console.log("on header called");
         const hash = msg.header.hash();
 
         // Check if we have requested this header.
@@ -777,6 +905,8 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     async _onTx(msg) {
+        // console.log("on txn called", msg);
+
         const hash = msg.transaction.hash();
         //Log.d(BaseConsensusAgent, () => `[TX] Received transaction ${hash} from ${this._peer.peerAddress}`);
 
@@ -820,12 +950,80 @@ class BaseConsensusAgent extends Observable {
     }
 
     /**
+     * @param {DeliberationMessage} msg
+     * @return {Promise}
+     * @protected
+     */
+    async _onMsg(msg) {
+        // console.log("on msg called", msg);
+
+        msg.message.encodeMessage();
+        const hash = msg.message.hash();
+        
+        // Check if we have requested this transaction.
+        const vector = new InvVector(InvVector.Type.MESSAGE, hash);
+        if (!this._objectsInFlight.contains(vector) && !this._objectsThatFlew.contains(vector)) {
+            Log.w(BaseConsensusAgent, `Unsolicited message ${hash} received from ${this._peer.peerAddress}, discarding`);
+            console.log("Inside");
+            return;
+        }
+        
+        this._invRequestManager.noteVectorReceived(InvVector.fromMessage(msg.message));
+
+        // Mark object as received.
+        this._onObjectReceived(vector);
+
+        // Mark message as processing.
+        this._objectsProcessing.add(vector);
+
+        // @UP: TODO: Skipped this just as i have skippe this in relayMessage
+        // @UP: Instead we directly process the message because that is what we need to do anyway
+        //Process message if we subscribed for this transaction.
+        // if (this._localSubscription.matchesTransaction(msg.transaction)) {
+        //     await this._processTransaction(hash, msg.transaction);
+        // }
+
+        await this._processMessage(hash, msg.message);
+
+        const msgRequest = this._pendingRequests.get(vector);
+        if (msgRequest) {
+            this._pendingRequests.remove(vector);
+            this._timers.clearTimeout(`tx-request-${vector.hash.toBase64()}`);
+            for (const {resolve} of msgRequest) {
+                try {
+                    resolve(msg.message);
+                } catch (e) {
+                    // Ignore
+                }
+            }
+        } 
+
+        // @UP: TODO: COmmenenting anything to do with subscription
+        // else if (!this._localSubscription.matchesTransaction(msg.transaction) && this._lastSubscriptionChange + BaseConsensusAgent.SUBSCRIPTION_CHANGE_GRACE_PERIOD > Date.now()) {
+        //     this._peer.channel.close(CloseType.TRANSACTION_NOT_MATCHING_SUBSCRIPTION, 'received transaction not matching our subscription');
+        // }
+
+        // Mark object as processed.
+        this._onObjectProcessed(vector);
+
+    }
+
+    /**
      * @param {Hash} hash
      * @param {Transaction} transaction
      * @returns {Promise.<void>}
      * @protected
      */
     async _processTransaction(hash, transaction) {
+    }
+
+    /**
+     * @param {Hash} hash
+     * @param {DeliberationMessage} message
+     * @returns {Promise.<void>}
+     * @protected
+     */
+    async _processMessage(hash, message) {
     }
 
     /**
@@ -946,6 +1144,9 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     async _onGetData(msg) {
+        //TODO: @UP ADD DelliberationMessage stuff here
+        // console.log("on get data called");
+
         // Keep track of the objects the peer knows.
         for (const vector of msg.vectors) {
             this._knownObjects.add(vector);
@@ -980,6 +1181,20 @@ class BaseConsensusAgent extends Observable {
                     }
                     break;
                 }
+                case InvVector.Type.MESSAGE: {
+                    const msg = this._getMessage(vector.hash);
+                    if (msg) {
+                        // We have found a requested message, send it back to the sender.
+                        this._peer.channel.msg(msg);
+                        //@UP TODO: The message-relayed event should be handled appropriately in the future
+                        this.fire('message-relayed', msg);
+                    } else {
+                        // console.log("else");
+                        // Requested transaction is unknown.
+                        unknownObjects.push(vector);
+                    }
+                    break;
+                }
                 default:
                     // ignore
             }
@@ -997,6 +1212,8 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     async _onGetHeader(msg) {
+        // console.log("on get header called", msg);
+
         // Keep track of the objects the peer knows.
         for (const vector of msg.vectors) {
             this._knownObjects.add(vector);

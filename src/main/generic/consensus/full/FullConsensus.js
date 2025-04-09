@@ -175,6 +175,12 @@ class FullConsensus extends BaseConsensus {
         return BaseConsensus.SendTransactionResult.NONE;
     }
 
+    // @UP
+    async sendMessage(msg){
+        const mempoolCode = await this._mempool.pushMessage(msg);
+        //TODO: handle the mempool code switch case
+    }
+
     /**
      * @returns {Array.<Transaction>}
      */
@@ -182,6 +188,14 @@ class FullConsensus extends BaseConsensus {
         return this._mempool.getTransactions();
     }
 
+    // @UP
+    /**
+     * @returns {Array.<Transaction>}
+     */
+    getMempoolMessages(){
+        return this._mempool.getMessages();
+    }
+    
     //
     //
 

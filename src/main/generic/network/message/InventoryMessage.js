@@ -26,6 +26,11 @@ class InvVector {
         return new InvVector(InvVector.Type.TRANSACTION, hash);
     }
 
+    static fromMessage(message) {
+        const hash = message.hash();        
+        return new InvVector(InvVector.Type.MESSAGE, hash);
+    }
+
     /**
      * @param {InvVector.Type} type
      * @param {Hash} hash
@@ -56,7 +61,16 @@ class InvVector {
     serialize(buf) {
         buf = buf || new SerialBuffer(this.serializedSize);
         buf.writeUint32(this._type);
-        this._hash.serialize(buf);
+
+        if(this._hash instanceof Hash){
+            this._hash.serialize(buf);
+        }
+        else{
+            console.log("exitttt");
+            buf = buf || new SerialBuffer(this.serializedSize);
+            buf.write(this.hash);
+        }
+        
         return buf;
     }
 
@@ -86,8 +100,15 @@ class InvVector {
 
     /** @type {number} */
     get serializedSize() {
-        return /*invType*/ 4
+        // return /*invType*/ 4
+        //     + this._hash.serializedSize;
+        if(this._hash instanceof Hash){
+            return 4
             + this._hash.serializedSize;
+        }
+        if(vector._hash instanceof Uint8Array){
+            return 4 + this._hash.length
+        }
     }
 
     /** @type {InvVector.Type} */
@@ -107,6 +128,7 @@ InvVector.Type = {
     ERROR: 0,
     TRANSACTION: 1,
     BLOCK: 2,
+    MESSAGE: 3,
 
     /**
      * @param {SerialBuffer} buf

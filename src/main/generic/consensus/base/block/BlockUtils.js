@@ -114,6 +114,19 @@ class BlockUtils {
         return new BigNumber(hash.toHex(), 16).lte(target);
     }
 
+    //@UP an alternative to isProofOfWork
+    // for this case it will just be checking if the hash is correct
+    /**
+     * @param {Hash} hash
+     * @param {Block} block
+     * @returns {boolean}
+     */
+    static async verifyHash(hash, block) {
+        const worker = await CryptoWorker.getInstanceAsync();
+        const newHash = await worker.computeArgon2d(block.header.serialize());
+        return newHash == hash;
+    }
+
     /**
      * @param {number} compact
      * @returns {boolean}

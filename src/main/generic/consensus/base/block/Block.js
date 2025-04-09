@@ -1,18 +1,15 @@
+// @UP: changing block class so that it does not have blockinterlink
 class Block {
     /**
      * @param {BlockHeader} header
-     * @param {BlockInterlink} interlink
      * @param {BlockBody} [body]
      */
-    constructor(header, interlink, body) {
+    constructor(header, body) {
         if (!(header instanceof BlockHeader)) throw new Error('Malformed header');
-        if (!(interlink instanceof BlockInterlink)) throw new Error('Malformed interlink');
         if (body && !(body instanceof BlockBody)) throw new Error('Malformed body');
 
         /** @type {BlockHeader} */
         this._header = header;
-        /** @type {BlockInterlink} */
-        this._interlink = interlink;
         /** @type {BlockBody} */
         this._body = body;
     }
@@ -23,7 +20,6 @@ class Block {
      */
     static unserialize(buf) {
         const header = BlockHeader.unserialize(buf);
-        const interlink = BlockInterlink.unserialize(buf, header.prevHash);
 
         let body = undefined;
         const bodyPresent = buf.readUint8();
@@ -31,7 +27,7 @@ class Block {
             body = BlockBody.unserialize(buf);
         }
 
-        return new Block(header, interlink, body);
+        return new Block(header, body);
     }
 
     /**
@@ -41,7 +37,6 @@ class Block {
     serialize(buf) {
         buf = buf || new SerialBuffer(this.serializedSize);
         this._header.serialize(buf);
-        this._interlink.serialize(buf);
 
         if (this._body) {
             buf.writeUint8(1);
@@ -56,7 +51,6 @@ class Block {
     /** @type {number} */
     get serializedSize() {
         return this._header.serializedSize
-            + this._interlink.serializedSize
             + /*bodyPresent*/ 1
             + (this._body ? this._body.serializedSize : 0);
     }
@@ -71,13 +65,14 @@ class Block {
                 // worker overhead doesn't pay off for small transaction numbers
                 this._valid = await this._verify(time.now());
             } else {
+                //@UP: TODO: This can be removed execution should never flow here
+                // as txn.length cannot be >=150.
                 const transactionValid = this.body.transactions.map(t => t._valid);
                 const worker = await CryptoWorker.getInstanceAsync();
-                const {valid, pow, interlinkHash, bodyHash} = await worker.blockVerify(this.serialize(),
+                const {valid, pow, bodyHash} = await worker.blockVerify(this.serialize(),
                     transactionValid, time.now(), GenesisConfig.GENESIS_HASH.serialize(), GenesisConfig.NETWORK_ID);
                 this._valid = valid;
                 this.header._pow = Hash.unserialize(new SerialBuffer(pow));
-                this.interlink._hash = Hash.unserialize(new SerialBuffer(interlinkHash));
                 this.body._hash = Hash.unserialize(new SerialBuffer(bodyHash));
             }
         }
@@ -95,46 +90,14 @@ class Block {
             return false;
         }
 
-        // Check that the header hash matches the difficulty.
-        if (!(await this._header.verifyProofOfWork())) {
-            Log.w(Block, 'Invalid block - PoW verification failed');
-            return false;
-        }
-
         // Check that the maximum block size is not exceeded.
         if (this.serializedSize > Policy.BLOCK_SIZE_MAX) {
             Log.w(Block, 'Invalid block - max block size exceeded');
             return false;
         }
 
-        // Verify that the interlink is valid.
-        if (!this._verifyInterlink()) {
-            return false;
-        }
-
         // XXX Verify the body only if it is present.
         if (this.isFull() && !this._verifyBody()) {
-            return false;
-        }
-
-        // Everything checks out.
-        return true;
-    }
-
-    /**
-     * @returns {boolean}
-     * @private
-     */
-    _verifyInterlink() {
-        // Skip check for genesis block due to the cyclic dependency (since the interlink hash contains the genesis block hash).
-        if (this.height === 1 && this._header.interlinkHash.equals(new Hash(null))) {
-            return true;
-        }
-
-        // Check that the interlinkHash given in the header matches the actual interlinkHash.
-        const interlinkHash = this._interlink.hash();
-        if (!this._header.interlinkHash.equals(interlinkHash)) {
-            Log.w(Block, 'Invalid block - interlink hash mismatch');
             return false;
         }
 
@@ -173,117 +136,6 @@ class Block {
             return false;
         }
 
-        // Check that the interlink is correct.
-        const interlink = await predecessor.getNextInterlink(this.target, this.version);
-        if (!this._interlink.equals(interlink)) {
-            return false;
-        }
-
-        // Everything checks out.
-        return true;
-    }
-
-    /**
-     * @param {Block} predecessor
-     * @returns {Promise.<boolean>}
-     */
-    async isInterlinkSuccessorOf(predecessor) {
-        // Check that the height is higher than the predecessor's.
-        if (this._header.height <= predecessor.header.height) {
-            Log.v(Block, 'No interlink successor - height');
-            return false;
-        }
-
-        // Check that the timestamp is greater or equal to the predecessor's timestamp.
-        if (this._header.timestamp < predecessor.header.timestamp) {
-            Log.v(Block, 'No interlink successor - timestamp');
-            return false;
-        }
-
-        // Check that the predecessor is contained in this block's interlink and verify its position.
-        const prevHash = predecessor.hash();
-        if (!GenesisConfig.GENESIS_HASH.equals(prevHash)) {
-            const prevPow = await predecessor.pow();
-            const targetHeight = BlockUtils.getTargetHeight(this.target);
-            let blockFound = false;
-
-            let depth = 0;
-            for (; depth < this._interlink.length; depth++) {
-                if (prevHash.equals(this._interlink.hashes[depth])) {
-                    blockFound = true;
-                    const target = new BigNumber(2).pow(targetHeight - depth);
-                    if (!BlockUtils.isProofOfWork(prevPow, target)) {
-                        Log.v(Block, 'No interlink successor - invalid position in interlink');
-                        return false;
-                    }
-                }
-            }
-
-            if (!blockFound) {
-                Log.v(Block, 'No interlink successor - not in interlink');
-                return false;
-            }
-        }
-
-        // If the predecessor happens to be the immediate predecessor, check additionally:
-        // - that the height of the successor is one higher
-        // - that the interlink is correct.
-        if (this._header.prevHash.equals(prevHash)) {
-            if (this._header.height !== predecessor.header.height + 1) {
-                Log.v(Block, 'No interlink successor - immediate height');
-                return false;
-            }
-
-            const interlink = await predecessor.getNextInterlink(this.target, this.version);
-            const interlinkHash = interlink.hash();
-            if (!this._header.interlinkHash.equals(interlinkHash)) {
-                Log.v(Block, 'No interlink successor - immediate interlink');
-                return false;
-            }
-        }
-        // Otherwise, if the prevHash doesn't match but the blocks should be adjacent according to their height fields,
-        // this cannot be a valid successor of predecessor.
-        else if (this._header.height === predecessor.header.height + 1) {
-            Log.v(Block, 'No interlink successor - immediate height (2)');
-            return false;
-        }
-        // Otherwise, check that the interlink construction is valid given the information we have.
-        else {
-            // TODO Take different targets into account.
-
-            // The number of new blocks in the interlink is bounded by the height difference.
-            /** @type {HashSet.<Hash>} */
-            const hashes = new HashSet();
-            hashes.addAll(this._interlink.hashes);
-            hashes.removeAll(predecessor.interlink.hashes);
-            if (hashes.length > this._header.height - predecessor.header.height) {
-                Log.v(Block, 'No interlink successor - too many new blocks');
-                return false;
-            }
-
-            // Check that the interlink is not too short.
-            const thisDepth = BlockUtils.getTargetDepth(this.target);
-            const prevDepth = BlockUtils.getTargetDepth(predecessor.target);
-            const depthDiff = thisDepth - prevDepth;
-            if (this._interlink.length < predecessor.interlink.length - depthDiff) {
-                Log.v(Block, 'No interlink successor - interlink too short');
-                return false;
-            }
-
-            // If the same block is found in both interlinks, all blocks at lower depths must be the same in both interlinks.
-            let commonBlock = false;
-            const thisInterlink = this._interlink.hashes;
-            const prevInterlink = predecessor.interlink.hashes;
-            for (let i = 1; i < prevInterlink.length && i - depthDiff < thisInterlink.length; i++) {
-                if (prevInterlink[i].equals(thisInterlink[i - depthDiff])) {
-                    commonBlock = true;
-                } else if (commonBlock) {
-                    Log.v(Block, 'No interlink successor - invalid common suffix');
-                    return false;
-                }
-            }
-        }
-
         // Everything checks out.
         return true;
     }
@@ -294,47 +146,14 @@ class Block {
      */
     async isSuccessorOf(predecessor) {
         // TODO Improve this! Lots of duplicate checks.
-        return (await this.isImmediateSuccessorOf(predecessor)) || (await this.isInterlinkSuccessorOf(predecessor));
-    }
-
-    /**
-     * @param {BigNumber} nextTarget
-     * @param {number} [nextVersion]
-     * @returns {Promise.<BlockInterlink>}
-     */
-    async getNextInterlink(nextTarget, nextVersion = BlockHeader.CURRENT_VERSION) {
-        /** @type {Array.<Hash>} */
-        const hashes = [];
-        const hash = this.hash();
-
-        // Compute how many times this blockHash should be included in the next interlink.
-        const thisPowDepth = BlockUtils.getHashDepth(await this.pow());
-        const nextTargetDepth = BlockUtils.getTargetDepth(nextTarget);
-        const numOccurrences = Math.max(thisPowDepth - nextTargetDepth + 1, 0);
-
-        // Push this blockHash numOccurrences times onto the next interlink.
-        for (let i = 0; i < numOccurrences; i++) {
-            hashes.push(hash);
-        }
-
-        // Compute how many blocks to omit from the beginning of this interlink.
-        const thisTargetDepth = BlockUtils.getTargetDepth(this.target);
-        const targetOffset = nextTargetDepth - thisTargetDepth;
-        const interlinkOffset = numOccurrences + targetOffset;
-
-        // Push the remaining hashes from this interlink.
-        for (let i = interlinkOffset; i < this.interlink.length; i++) {
-            hashes.push(this.interlink.hashes[i]);
-        }
-
-        return new BlockInterlink(hashes, hash);
+        return (await this.isImmediateSuccessorOf(predecessor));
     }
 
     /**
      * @returns {Block}
      */
     shallowCopy() {
-        return new Block(this._header, this._interlink, this._body);
+        return new Block(this._header, this._body);
     }
 
     /**
@@ -344,7 +163,6 @@ class Block {
     equals(o) {
         return o instanceof Block
             && this._header.equals(o._header)
-            && this._interlink.equals(o._interlink)
             && (this._body ? this._body.equals(o._body) : !o._body);
     }
 
@@ -374,7 +192,7 @@ class Block {
      * @returns {Block}
      */
     toFull(body) {
-        return this.isFull() ? this : new Block(this._header, this._interlink, body);
+        return this.isFull() ? this : new Block(this._header, body);
     }
 
     /**
@@ -382,13 +200,6 @@ class Block {
      */
     get header() {
         return this._header;
-    }
-
-    /**
-     * @type {BlockInterlink}
-     */
-    get interlink() {
-        return this._interlink;
     }
 
     /**
@@ -418,13 +229,6 @@ class Block {
     /**
      * @type {Hash}
      */
-    get interlinkHash() {
-        return this._header.interlinkHash;
-    }
-
-    /**
-     * @type {Hash}
-     */
     get bodyHash() {
         return this._header.bodyHash;
     }
@@ -443,6 +247,7 @@ class Block {
         return this._header.nBits;
     }
 
+    //@UP TODO: these can be removed later 
     /**
      * @type {BigNumber}
      */
@@ -545,7 +350,7 @@ class Block {
     static fromPlain(plain) {
         const header = new BlockHeader(
             Hash.fromAny(plain.prevHash),
-            Hash.fromAny(plain.interlinkHash),
+            // Hash.fromAny(plain.interlinkHash),
             Hash.fromAny(plain.bodyHash),
             Hash.fromAny(plain.accountsHash),
             plain.nBits,
@@ -554,7 +359,7 @@ class Block {
             plain.nonce,
             plain.version
         );
-        const interlink = new BlockInterlink((plain.interlink.hashes || plain.interlink).map(h => Hash.fromAny(h)), Hash.fromAny(plain.prevHash));
+        // const interlink = new BlockInterlink((plain.interlink.hashes || plain.interlink).map(h => Hash.fromAny(h)), Hash.fromAny(plain.prevHash));
         let body = null;
         if (plain.minerAddr && plain.extraData !== undefined && Array.isArray(plain.transactions) && Array.isArray(plain.prunedAccounts)) {
             body = new BlockBody(
@@ -564,7 +369,7 @@ class Block {
                 plain.prunedAccounts.map(pa => PrunedAccount.fromAny(pa))
             );
         }
-        return new Block(header, interlink, body);
+        return new Block(header, body);
     }
 
     toString() {
@@ -576,7 +381,7 @@ class Block {
             version: this.version,
             hash: this.hash().toPlain(),
             prevHash: this.prevHash.toPlain(),
-            interlinkHash: this.interlinkHash.toPlain(),
+            // interlinkHash: this.interlinkHash.toPlain(),
             bodyHash: this.bodyHash.toPlain(),
             accountsHash: this.accountsHash.toPlain(),
             nBits: this.nBits,
@@ -584,7 +389,7 @@ class Block {
             height: this.height,
             timestamp: this.timestamp,
             nonce: this.nonce,
-            interlink: this.interlink.hashes.map(h => h.toPlain()),
+            // interlink: this.interlink.hashes.map(h => h.toPlain()),
         };
         if (this.isFull()) {
             plain.minerAddr = this.minerAddr.toPlain();

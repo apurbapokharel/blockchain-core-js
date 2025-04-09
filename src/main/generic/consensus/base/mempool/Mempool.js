@@ -24,6 +24,10 @@ class Mempool extends Observable {
         /** @type {Synchronizer} */
         this._synchronizer = new Synchronizer();
 
+        //@UP: For message mempool
+        /** @type {HashMap.<Hash, DeliberationMessage>} */
+        this._messagesByHash = new HashMap();
+
         // Listen for changes in the blockchain head to evict transactions that have become invalid.
         blockchain.on('head-changed', (block, rebranching) => {
             if (!rebranching) {
@@ -43,6 +47,11 @@ class Mempool extends Observable {
      */
     pushTransaction(transaction) {
         return this._synchronizer.push(() => this._pushTransaction(transaction));
+    }
+
+    // @UP
+    pushMessage(message) {
+        return this._synchronizer.push(() => this._pushMessage(message));
     }
 
     /**
@@ -172,6 +181,21 @@ class Mempool extends Observable {
         return Mempool.ReturnCode.ACCEPTED;
     }
 
+    // @UP
+    async _pushMessage(message) {
+        // Check if we already know this message.
+        const hash = message.hash();
+        if (this._messagesByHash.contains(hash)) {
+            return Mempool.ReturnCode.KNOWN;
+        }
+
+        this._messagesByHash.put(hash, message);
+
+        this.fire('message-added', message);
+
+        return Mempool.ReturnCode.ACCEPTED;
+    }
+
     /**
      * @private
      */
@@ -233,6 +257,15 @@ class Mempool extends Observable {
         return this._transactionsByHash.get(hash);
     }
 
+    // @UP
+    /**
+     * @param {Hash} hash
+     * @returns {Transaction}
+     */
+    getMessage(hash) {
+        return this._messagesByHash.get(hash);
+    }
+
     /**
      * @param {number} [maxSize]
      * @param {number} [minFeePerByte]
@@ -259,6 +292,34 @@ class Mempool extends Observable {
         return Array.from(this.transactionGenerator(maxSize, minFeePerByte));
     }
 
+    // @UP
+    /**
+     * @param {number} [maxSize]
+     * @yields {IterableIterator.<Transaction>}
+     */
+     *messageGenerator(maxSize = Infinity) {
+        let size = 0;
+        for (const [hash, msg] of this._messagesByHash.entryIterator()) {
+
+        // for (const /** @type {DeliberationMessage} */ msg of this._messagesByHash) {
+            const msgSize = msg.serializedSize;
+            if (size + msgSize >= maxSize) continue;
+
+            yield msg;
+            size += msgSize;
+        }
+    }
+    
+    // @UP
+    /**
+     * @param {number} [maxSize]
+     * @returns {Array.<Transaction>}
+     */
+    getMessages(maxSize = Infinity) {
+        return Array.from(this.messageGenerator(maxSize));
+    }
+
+
     /**
      * @param {number} maxSize
      * @returns {Promise.<Array.<Transaction>>}
@@ -275,6 +336,16 @@ class Mempool extends Observable {
 
         transactions.sort((a, b) => a.compareBlockOrder(b));
         return transactions;
+    }
+
+    // @UP
+    /**
+     * @param {number} maxSize
+     * @returns {Promise.<Array.<Transaction>>}
+     */
+    async getMessagesForBlock(maxSize) {
+        const messages = this.getMessages(maxSize);
+        return messages;
     }
 
     /**
@@ -454,6 +525,11 @@ class Mempool extends Observable {
                 }
                 this._transactionSetBySender.remove(sender);
             }
+        }
+
+        //@UP: Remove the messages from the mempool
+        for (const [hash, msg] of this._messagesByHash.entryIterator()) {
+            this._messagesByHash.remove(hash)
         }
 
         // Tell listeners that the pool has updated after a blockchain head change.

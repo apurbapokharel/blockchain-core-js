@@ -80,6 +80,7 @@ class Message {
      * @returns {SerialBuffer}
      */
     serialize(buf) {
+        // console.log("serialized of message");
         buf = buf || new SerialBuffer(this.serializedSize);
         // XXX Direct buffer manipulation currently requires this.
         Assert.that(buf.writePos === 0, 'Message.serialize() requires buf.writePos == 0');
@@ -88,12 +89,15 @@ class Message {
         buf.writeVarUint(this._type);
         buf.writeUint32(this.serializedSize);
         buf.writeUint32(0); // written later by _setChecksum()
+        // console.log("serialized of message exit");
 
         return buf;
     }
 
     /** @type {number} */
     get serializedSize() {
+        // console.log("inside message serializedSize", SerialBuffer.varUintSize(this._type));
+        
         return /*magic*/ 4
             + /*type*/ SerialBuffer.varUintSize(this._type)
             + /*length*/ 4
@@ -162,10 +166,13 @@ Message.Type = {
     MEMPOOL:    9,
     REJECT:     10,
     SUBSCRIBE:  11,
+    MSG:        12,
 
     ADDR:       20,
     GET_ADDR:   21,
     PING:       22,
+    PING2:      25,
+    PING3:      26,
     PONG:       23,
 
     SIGNAL:     30,

@@ -18,24 +18,21 @@ class BlockProducer {
      * @return {Promise.<Block>}
      */
     async getNextBlock(address, extraData = new Uint8Array(0)) {
-        const nextTarget = await this._blockchain.getNextTarget();
-        const interlink = await this._getNextInterlink(nextTarget);
-        const body = await this._getNextBody(interlink.serializedSize, address, extraData);
-        const header = await this._getNextHeader(nextTarget, interlink, body);
-        if (!(await this._blockchain.getNextTarget()).equals(nextTarget)) return this.getNextBlock(address, extraData);
-        return new Block(header, interlink, body);
+        // const nextTarget = await this._blockchain.getNextTarget();
+        // const interlink = await this._getNextInterlink(nextTarget);
+        const body = await this._getNextBody(address, extraData);
+        const header = await this._getNextHeader(body);
+        // if (!(await this._blockchain.getNextTarget()).equals(nextTarget)) return this.getNextBlock(address, extraData);
+        return new Block(header, body);
     }
 
     /**
-     * @param {BigNumber} nextTarget
-     * @param {BlockInterlink} interlink
      * @param {BlockBody} body
      * @return {Promise.<BlockHeader>}
      * @package
      */
-    async _getNextHeader(nextTarget, interlink, body) {
+    async _getNextHeader(body) {
         const prevHash = this._blockchain.headHash;
-        const interlinkHash = interlink.hash();
         const height = this._blockchain.height + 1;
 
         // Compute next accountsHash.
@@ -52,37 +49,33 @@ class BlockProducer {
 
         const bodyHash = body.hash();
         const timestamp = this._getNextTimestamp();
-        const nBits = BlockUtils.targetToCompact(nextTarget);
-        const nonce = 0;
-        return new BlockHeader(prevHash, interlinkHash, bodyHash, accountsHash, nBits, height, timestamp, nonce);
+        return new BlockHeader(prevHash, bodyHash, accountsHash, height, timestamp);
     }
 
     /**
-     * @param {BigNumber} nextTarget
-     * @returns {Promise.<BlockInterlink>}
-     * @package
-     */
-    _getNextInterlink(nextTarget) {
-        return this._blockchain.head.getNextInterlink(nextTarget);
-    }
-
-    /**
-     * @param {number} interlinkSize
      * @param {Address} address
      * @param {Uint8Array} extraData
      * @return {BlockBody}
      * @package
      */
-    async _getNextBody(interlinkSize, address, extraData) {
+    //@UP FIXME: need to fix the size
+    async _getNextBody(address, extraData) {
         const maxSize = Policy.BLOCK_SIZE_MAX
             - BlockHeader.SERIALIZED_SIZE
-            - interlinkSize
             - BlockBody.getMetadataSize(extraData);
         const transactions = await this._mempool.getTransactionsForBlock(maxSize);
-        const prunedAccounts = await this._accounts.gatherToBePrunedAccounts(transactions, this._blockchain.height + 1, this._blockchain.transactionCache);
-        return new BlockBody(address, transactions, extraData, prunedAccounts);
-    }
+        const messages = await this._mempool.getMessagesForBlock(maxSize);
+        let messageString = "";
+        for (const msg of messages){
+            messageString += msg._senderPubKey.toHex() + " : " + msg._decodedMessage + "\n";
+            // console.log("message sent from mempool", msg._decodedMessage);
+        }
+        const byteArray = BufferUtils.fromAscii(messageString);
 
+        const prunedAccounts = await this._accounts.gatherToBePrunedAccounts(transactions, this._blockchain.height + 1, this._blockchain.transactionCache);
+        return new BlockBody(address, transactions, byteArray, prunedAccounts);
+    }
+    
     /**
      * @return {number}
      * @package

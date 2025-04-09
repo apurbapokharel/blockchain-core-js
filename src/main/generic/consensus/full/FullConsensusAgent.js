@@ -356,6 +356,18 @@ class FullConsensusAgent extends BaseConsensusAgent {
         }
     }
 
+    // @UP
+    /**
+     * @param {Hash} hash
+     * @param {DeliberationMessage} message
+     * @returns {Promise.<void>}
+     * @protected
+     */
+    async _processMessage(hash, message) {
+        const result = await this._mempool.pushMessage(message);
+        //TODO: process the Mempool returned code, how they've done in processTransaction or processBlock
+    }
+
     /**
      * @protected
      * @override

@@ -18748,7 +18748,7 @@ class ChainData {
         // const superBlockCounts = this.superBlockCounts.copyAndAdd(BlockUtils.getHashDepth(pow));
         // return new ChainData(block, totalDifficulty, totalWork, superBlockCounts);
 
-        //TODO: APU: create new chainData
+        //@UP: create new chainData
         return new ChainData(block);
     }
 
@@ -20622,7 +20622,7 @@ class BaseConsensusAgent extends Observable {
 
         // Relay transaction to peer later.
         const serializedSize = message.serializedSize;
-        // APU: we can send it as a freeInvVector later
+        // @UP: we can send it as a freeInvVector later
         this._waitingInvVectors.enqueue(vector);
 
         // Assume that the peer knows this message after short time.
@@ -24706,7 +24706,7 @@ class FullConsensusAgent extends BaseConsensusAgent {
      */
     async _processMessage(hash, message) {
         const result = await this._mempool.pushMessage(message);
-        //TODO: APU: process the Mempool returned code
+        //@UP: process the Mempool returned code
     }
 
     /**

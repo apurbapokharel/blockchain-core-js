@@ -1,0 +1,2 @@
+# This file is not used anymore, please check /etc/nimiq/nimiq.conf
+# if you want to configure nimiq systemd service

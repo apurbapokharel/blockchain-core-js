@@ -473,19 +473,38 @@ class NetworkAgent extends Observable {
         }
     }
 
+ 
+    // _onPing(msg) {
+    //     // Make sure this is a valid message in our current state.
+    //     if (!this._canAcceptMessage(msg)) {
+    //         return;
+    //     }
+
+    //     // Respond with a pong message
+    //     this._channel.pong(msg.nonce);
+    // }  
+    // @UP
     /**
      * @param {PingMessage} msg
      * @private
-     */
+    */
     _onPing(msg) {
+        // console.log("on ping",msg)
         // Make sure this is a valid message in our current state.
         if (!this._canAcceptMessage(msg)) {
             return;
         }
-
+        if(msg instanceof PingMessage3){
+            //The backpass is not done as this work is just to check
+            //This will basically require the similar kinds of changes on the Pong class
+            this._channel.pong(123);
+        }
+        else{
+            this._channel.pong(msg.nonce);
+        }
         // Respond with a pong message
-        this._channel.pong(msg.nonce);
     }
+
 
     /**
      * @param {PongMessage} msg

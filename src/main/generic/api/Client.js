@@ -861,6 +861,15 @@ class Client {
         return new Client.TransactionDetails(tx, Client.TransactionState.NEW);
     }
 
+    async sendMessage(message){
+        let address = await this._network.getOwnAddress()        
+        let msg = new DeliberationMessage(message, address._address._publicKey, Math.floor(Date.now()/1000));        
+        msg.encodeMessage()
+        const consensus = await this._consensus;
+        let consensusResult = await consensus.sendMessage(msg);
+        //TODO: @UP handle the switch cases as handled above in sendTransaction
+    }
+
     /**
      * @param {BlockListener} listener
      * @return {Promise.<Handle>}

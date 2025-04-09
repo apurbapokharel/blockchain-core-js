@@ -182,6 +182,14 @@ class PeerChannel extends Observable {
     }
 
     /**
+     * @param {DeliberationMessage} message
+     * @return {boolean}
+    */
+    msg(message) {
+        return this._send(new DeliMessage(message));
+    }
+
+    /**
      * @param {Array.<Hash>} locators
      * @param {number} maxInvSize
      * @param {boolean} [ascending]
@@ -509,12 +517,15 @@ PeerChannel.Event[Message.Type.GET_BLOCKS] = 'get-blocks';
 PeerChannel.Event[Message.Type.BLOCK] = 'block';
 PeerChannel.Event[Message.Type.HEADER] = 'header';
 PeerChannel.Event[Message.Type.TX] = 'tx';
+PeerChannel.Event[Message.Type.MSG] = 'msg';
 PeerChannel.Event[Message.Type.MEMPOOL] = 'mempool';
 PeerChannel.Event[Message.Type.REJECT] = 'reject';
 PeerChannel.Event[Message.Type.SUBSCRIBE] = 'subscribe';
 PeerChannel.Event[Message.Type.ADDR] = 'addr';
 PeerChannel.Event[Message.Type.GET_ADDR] = 'get-addr';
 PeerChannel.Event[Message.Type.PING] = 'ping';
+PeerChannel.Event[Message.Type.PING2] = 'ping2';
+PeerChannel.Event[Message.Type.PING3] = 'ping3';
 PeerChannel.Event[Message.Type.PONG] = 'pong';
 PeerChannel.Event[Message.Type.SIGNAL] = 'signal';
 PeerChannel.Event[Message.Type.GET_CHAIN_PROOF] = 'get-chain-proof';

@@ -54,6 +54,13 @@ Client.Mempool = class Mempool {
         return new Client.MempoolStatistics(consensus.getMempoolContents());
     }
 
+    //  @UP
+    async getMessageCount() {
+        const consensus = await this._client._consensus;
+        const messages = consensus.getMempoolMessages();
+        return messages.length;
+    }
+
     /**
      * @param {MempoolListener} listener
      * @return {Promise<Handle>}

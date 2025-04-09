@@ -9,7 +9,6 @@ class Miner extends Observable {
      * @param {Time} time
      * @param {Address} minerAddress
      * @param {Uint8Array} [extraData=new Uint8Array(0)]
-     *
      * @listens Mempool#transaction-added
      * @listens Mempool#transaction-ready
      */
@@ -32,7 +31,6 @@ class Miner extends Observable {
         this._address = minerAddress;
         /** @type {Uint8Array} */
         this._extraData = extraData;
-
         /**
          * Number of hashes computed since the last hashrate update.
          * @type {number}
@@ -140,9 +138,11 @@ class Miner extends Observable {
     }
 
     startWork() {
-        if (this.working) {
-            return;
-        }
+        // @UP: I commented these out as these were stopping the interval call to setWork when we did not have txn in mempool.
+        // if (this.working) {
+        //     console.log("about to return from Startwork")
+        //     return;
+        // }
 
         // Initialize hashrate computation.
         this._hashCount = 0;
@@ -161,11 +161,36 @@ class Miner extends Observable {
         this._startWork().catch(Log.w.tag(Miner));
     }
 
+    getTimeDifference(unix1, unix2) {
+        // Convert Unix timestamps to milliseconds
+        const date1 = new Date(unix1);
+        const date2 = new Date(unix2);
+    
+        // Calculate the difference in milliseconds
+        const diffInMs = Math.abs(date2 - date1);
+    
+        // Convert to seconds, minutes, hours, or days as needed
+        const diffInSeconds = diffInMs / 1000;
+        const diffInMinutes = diffInSeconds / 60;
+        const diffInHours = diffInMinutes / 60;
+        const diffInDays = diffInHours / 24;
+    
+        return {
+            milliseconds: diffInMs,
+            seconds: diffInSeconds,
+            minutes: diffInMinutes,
+            hours: diffInHours,
+            days: diffInDays,
+        };
+    }
+
     async _startWork() {
+        //@UP: I commented these out as these were stopping the interval call to setWork when we did not have txn in mempool.
         // XXX Needed as long as we cannot unregister from transactions-ready events.
-        if (!this.working || this._restarting) {
-            return;
-        }
+        // if (!this.working || this._restarting) {
+        //     console.log("about to return from _StartWork")
+        //     return;
+        // }
         try {
             this._lastRestart = Date.now();
             this._restarting = true;
@@ -173,19 +198,51 @@ class Miner extends Observable {
 
             // Construct next block.
             this._retry = 0;
-            const block = await this.getNextBlock();
-            if (block === null) {
-                this._stopWork();
-                return;
+            //@UP: I added these.
+            const transactionCount = (await (this._mempool.getTransactionsForBlock())).length;
+            const messages = await this._mempool.getMessages();
+            const messageCount = messages.length;
+            console.log("the transcation count in mempool is", transactionCount);
+            if(transactionCount == 0 && messageCount == 0){
+                console.log("There are no txn or msg in the mempool. Will look again in 3 seconds");
+                // return;
+            }
+            else{
+                let before = Date.now();
+                console.log("Time before", before);                
+                const block = await this.getNextBlock();   
+                let after = Date.now();   
+                console.log("Time after", after);
+                console.log("Difference", this.getTimeDifference(after, before));
+                
+                if (block === null) {
+                    this._stopWork();
+                    return;
+                }
+    
+                if (block.isFull()) {
+                    Log.d(Miner, `Starting work on block #${block.header.height} / ${block.minerAddr.toUserFriendlyAddress()} / ${BufferUtils.toBase64(block.body.extraData)} with ${block.transactionCount} transactions (${this._hashrate} H/s)`);
+                } else {
+                    Log.d(Miner, `Starting work on block #${block.header.height} from pool (${this._hashrate} H/s)`);
+                }
+    
+                this._workerPool.startMiningOnBlock(block, this._shareCompactSet ? this._shareCompact : undefined).catch(Log.w.tag(Miner));    
             }
 
-            if (block.isFull()) {
-                Log.d(Miner, `Starting work on block #${block.header.height} / ${block.minerAddr.toUserFriendlyAddress()} / ${BufferUtils.toBase64(block.body.extraData)} with ${block.transactionCount} transactions (${this._hashrate} H/s)`);
-            } else {
-                Log.d(Miner, `Starting work on block #${block.header.height} from pool (${this._hashrate} H/s)`);
-            }
+            // const block = await this.getNextBlock();
+            // if (block === null) {
+            //     this._stopWork();
+            //     return;
+            // }
 
-            this._workerPool.startMiningOnBlock(block, this._shareCompactSet ? this._shareCompact : undefined).catch(Log.w.tag(Miner));
+            // if (block.isFull()) {
+            //     Log.d(Miner, `Starting work on block #${block.header.height} / ${block.minerAddr.toUserFriendlyAddress()} / ${BufferUtils.toBase64(block.body.extraData)} with ${block.transactionCount} transactions (${this._hashrate} H/s)`);
+            // } else {
+            //     Log.d(Miner, `Starting work on block #${block.header.height} from pool (${this._hashrate} H/s)`);
+            // }
+
+            // this._workerPool.startMiningOnBlock(block, this._shareCompactSet ? this._shareCompact : undefined).catch(Log.w.tag(Miner));    
+
         } catch (e) {
             Log.e(Miner, e);
             Log.w(Miner, 'Failed to start work, retrying in 100ms');
@@ -193,6 +250,7 @@ class Miner extends Observable {
             setTimeout(() => this.startWork(), 100);
         } finally {
             this._restarting = false;
+            setTimeout(() => this.startWork(), 3000);
         }
     }
 
@@ -200,16 +258,62 @@ class Miner extends Observable {
      * @param {{hash: Hash, nonce: number, block: Block}} obj
      */
     async onWorkerShare(obj) {
-        this._hashCount += this._workerPool.noncesPerRun;
+        // console.log("INSIDE onWorkShare", obj);
+        // this._hashCount += this._workerPool.noncesPerRun;
+        // if (obj.block && obj.block.prevHash.equals(this._blockchain.headHash)) {
+        //     console.log("INSIDE onWorkShare -> if");
+        //     Log.d(Miner, () => `Received share: ${obj.nonce} / ${obj.hash.toHex()}`);
+        //     if (!this._submittingBlock) {
+        //         obj.block.header.nonce = obj.nonce;
+
+        //         let blockValid = false;
+        //         if (obj.block.isFull() && BlockUtils.isProofOfWork(obj.hash, obj.block.target)) {
+        //             this._submittingBlock = true;
+        //             if (await obj.block.header.verifyProofOfWork()) {
+        //                 this._numBlocksMined++;
+        //                 blockValid = true;
+
+        //                 // Tell listeners that we've mined a block.
+        //                 this.fire('block-mined', obj.block, this);
+
+        //                 // Push block into blockchain.
+        //                 if ((await this._blockchain.pushBlock(obj.block)) < 0) {
+        //                     console.log("INSIDE if block for workershare");
+        //                     this._submittingBlock = false;
+        //                     this._startWork().catch(Log.w.tag(Miner));
+        //                     return;
+        //                 } else {
+        //                     console.log("INSIDE else block for workershare");
+        //                     this._submittingBlock = false;
+        //                 }
+        //             } else {
+        //                 Log.d(Miner, `Ignoring invalid share: ${await obj.block.header.pow()}`);
+        //             }
+        //         }
+
+        //         this.fire('share', obj.block, blockValid, this);
+        //     }
+        // }
+        // console.log("INSIDE onWorkShare outside -> if");
+
+        // if (this._mempoolChanged && this._lastRestart + Miner.MIN_TIME_ON_BLOCK < Date.now()) {
+        //     console.log("INSIDE onWorkShare last -> if");
+        //     this._startWork().catch(Log.w.tag(Miner));
+        //     console.log("EXITING onWorkShare last -> if");
+        // }
+
+
+        // this._hashCount += this._workerPool.noncesPerRun;
         if (obj.block && obj.block.prevHash.equals(this._blockchain.headHash)) {
             Log.d(Miner, () => `Received share: ${obj.nonce} / ${obj.hash.toHex()}`);
             if (!this._submittingBlock) {
-                obj.block.header.nonce = obj.nonce;
+                // obj.block.header.nonce = obj.nonce;
 
                 let blockValid = false;
-                if (obj.block.isFull() && BlockUtils.isProofOfWork(obj.hash, obj.block.target)) {
+                // if (obj.block.isFull() && BlockUtils.isProofOfWork(obj.hash, obj.block.target)) {
+                if (obj.block.isFull() && BlockUtils.verifyHash(obj.hash, obj.block)) {
                     this._submittingBlock = true;
-                    if (await obj.block.header.verifyProofOfWork()) {
+                    // if (await obj.block.header.verifyProofOfWork()) {
                         this._numBlocksMined++;
                         blockValid = true;
 
@@ -224,14 +328,15 @@ class Miner extends Observable {
                         } else {
                             this._submittingBlock = false;
                         }
-                    } else {
-                        Log.d(Miner, `Ignoring invalid share: ${await obj.block.header.pow()}`);
-                    }
+                } else {
+                    Log.d(Miner, `Ignoring invalid share: ${await obj.block.header.pow()}`);
+                }
+                this.fire('share', obj.block, blockValid, this);
                 }
 
-                this.fire('share', obj.block, blockValid, this);
-            }
         }
+        
+
         if (this._mempoolChanged && this._lastRestart + Miner.MIN_TIME_ON_BLOCK < Date.now()) {
             this._startWork().catch(Log.w.tag(Miner));
         }
@@ -253,13 +358,18 @@ class Miner extends Observable {
         }
     }
 
+    // @UP
+    async mint(){
+        const emptyBlock = await this.getNextBlock();
+        this._workerPool.startMiningOnBlock(emptyBlock, this._shareCompactSet ? this._shareCompact : undefined).catch(Log.w.tag(Miner));    
+    }
+
     /**
      * @fires Miner#stop
      */
-    stopWork() {
+     stopWork() {
         this._stopWork();
     }
-
     /**
      * @fires Miner#stop
      * @private

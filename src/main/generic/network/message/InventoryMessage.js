@@ -171,10 +171,16 @@ class BaseInventoryMessage extends Message {
 
     /** @type {number} */
     get serializedSize() {
-        let size = super.serializedSize
+        let size = super.serializedSize        
             + /*count*/ 2;
         for (const vector of this._vectors) {
-            size += vector.serializedSize;
+            if(vector._hash instanceof Hash){
+                size += vector.serializedSize;
+            }
+            if(vector._hash instanceof Uint8Array){
+                size += vector._hash.length
+            }
+            
         }
         return size;
     }

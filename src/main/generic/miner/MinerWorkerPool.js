@@ -52,6 +52,19 @@ class MinerWorkerPool extends IWorker.Pool(MinerWorker) {
                     }, blockHeader, compact, minNonce, maxNonce, 512);
                 });
             };
+
+            this.justHashHeader = async function (blockHeader){
+                return new Promise(async (resolve, fail) => {
+                    try {
+                        const instance = await CryptoWorker.getInstanceAsync(); 
+                        const hash = await (instance).computeArgon2d(blockHeader);
+                        resolve({hash});
+                    } catch (error) {
+                        fail(error);
+                    }
+                    
+                }); 
+            }
         }
     }
 
@@ -115,17 +128,22 @@ class MinerWorkerPool extends IWorker.Pool(MinerWorker) {
      * @param {number} [shareCompact] target of a share, in compact format.
      */
     async startMiningOnBlock(block, shareCompact) {
+        // console.log("4-------startMiner");
         this._block = block;
         this._shareCompact = shareCompact || block.nBits;
         if (!this._miningEnabled) {
-            await this._updateToSize();
-            this._activeNonces = [];
+            // console.log("4-------startMiner");
+            // await this._updateToSize();
+            // this._activeNonces = [];
             this._miningEnabled = true;
-            for (let i = 0; i < this.poolSize; ++i) {
+            //@UP: I changed this
+            // for (let i = 0; i < this.poolSize; ++i) {
+            for (let i = 0; i < 1; ++i) {
+                // console.log("4-------startMiner");
                 this._startMiner();
             }
         } else {
-            this._activeNonces = [{minNonce:0, maxNonce:0}];
+            // this._activeNonces = [{minNonce:0, maxNonce:0}];
         }
     }
 
@@ -138,21 +156,31 @@ class MinerWorkerPool extends IWorker.Pool(MinerWorker) {
             await this._superUpdateToSize.call(this);
         }
 
+        // console.log("4.1------------_updateToSizeBeforeWhile");
+        let i = 1;
         while (this._miningEnabled && this._activeNonces.length < this.poolSize) {
+            // console.log("4.2------------whilelooping i times===", i);
             this._startMiner();
+            i++;
         }
+        // console.log("4.3------------_updateToSizeAfterWhile");
+
     }
 
     _startMiner() {
-        if (this._activeNonces.length >= this.poolSize) {
-            return;
-        }
+        // console.log("5------------Inside _startMiner");
 
-        const minNonce = this._activeNonces.length === 0 ? 0 : Math.max.apply(null, this._activeNonces.map((a) => a.maxNonce));
-        const maxNonce = minNonce + this._noncesPerRun;
-        const nonceRange = {minNonce, maxNonce};
-        this._activeNonces.push(nonceRange);
-        this._singleMiner(nonceRange).catch((e) => Log.e(MinerWorkerPool, e));
+        // if (this._activeNonces.length >= this.poolSize) {
+        //     return;
+        // }
+
+        // const minNonce = this._activeNonces.length === 0 ? 0 : Math.max.apply(null, this._activeNonces.map((a) => a.maxNonce));
+        // const maxNonce = minNonce + this._noncesPerRun;
+        // const nonceRange = {minNonce, maxNonce};
+        // this._activeNonces.push(nonceRange);
+        this._singleMiner().catch((e) => Log.e(MinerWorkerPool, e));
+        // console.log("6------------Exiting _startMiner");
+
     }
 
     /**
@@ -160,37 +188,84 @@ class MinerWorkerPool extends IWorker.Pool(MinerWorker) {
      * @return {Promise.<void>}
      * @private
      */
-    async _singleMiner(nonceRange) {
+    async _singleMiner() {
+        // console.log("7------------Inside _singleMiner");
         let i = 0;
-        while (this._miningEnabled && (IWorker.areWorkersAsync || PlatformUtils.isNodeJs() || i === 0) && i < this._runsPerCycle) {
-            i++;
-            const block = this._block;
-            const result = await this.multiMine(block.header.serialize(), this._shareCompact, nonceRange.minNonce, nonceRange.maxNonce);
-            if (result) {
-                const hash = new Hash(result.hash);
-                this._observable.fire('share', {
-                    block,
-                    nonce: result.nonce,
-                    hash
-                });
-            } else {
-                this._observable.fire('no-share', {
-                    nonce: nonceRange.maxNonce
-                });
-            }
-            if (this._activeNonces.length > this.poolSize) {
-                this._activeNonces.splice(this._activeNonces.indexOf(nonceRange), 1);
-                return;
-            } else {
-                const newMin = Math.max.apply(null, this._activeNonces.map((a) => a.maxNonce));
-                const newRange = {minNonce: newMin, maxNonce: newMin + this._noncesPerRun};
-                this._activeNonces.splice(this._activeNonces.indexOf(nonceRange), 1, newRange);
-                nonceRange = newRange;
-            }
+        //@UP: I made the loop finite as i need it to run only once, since there will be no hashing so no need to run a loop at all
+        // while (this._miningEnabled && (IWorker.areWorkersAsync || PlatformUtils.isNodeJs() || i === 0) && i < this._runsPerCycle) {
+        // while (this._miningEnabled && (IWorker.areWorkersAsync || PlatformUtils.isNodeJs() || i === 0) && i < 100) {
+        //     i++;
+        //     const block = this._block;
+        //     const result = await this.multiMine(block.header.serialize(), this._shareCompact, nonceRange.minNonce, nonceRange.maxNonce);
+        //     // console.log("7.1------result is", result);
+        //     if (result) {
+        //         // console.log("7.2------inside result");
+        //         const hash = new Hash(result.hash);
+        //         this._observable.fire('share', {
+        //             block,
+        //             nonce: result.nonce,
+        //             hash
+        //         });
+        //     } else {
+        //         // console.log("7.3------inside result else");
+        //         this._observable.fire('no-share', {
+        //             nonce: nonceRange.maxNonce
+        //         });
+        //     }
+        //     // console.log("7.4--------outside IFELSE", this._activeNonces.length ,  this.poolSize);
+        //     if (this._activeNonces.length > this.poolSize) {
+        //         console.log("7.5------inside IF");
+        //         this._activeNonces.splice(this._activeNonces.indexOf(nonceRange), 1);
+        //         return;
+        //     } else {
+        //         // console.log("7.6------inside ELSE");
+        //         const newMin = Math.max.apply(null, this._activeNonces.map((a) => a.maxNonce));
+        //         const newRange = {minNonce: newMin, maxNonce: newMin + this._noncesPerRun};
+        //         // console.log("New range before splice", newRange);
+        //         this._activeNonces.splice(this._activeNonces.indexOf(nonceRange), 1, newRange);
+        //         nonceRange = newRange;
+        //         // console.log("New range after splice", newRange);
+        //     }
+        // }
+
+        //@UP Don't need to loop or hash as this is not PoW so remove them
+        const block = this._block;
+        const result = await this.justHashHeader(block.header.serialize());
+        // console.log("7.1------result is", result);
+        if (result) {
+            const hash = new Hash(result.hash);
+            this._observable.fire('share', {
+                block,
+                hash
+            });
+        } else {
+            // TODO: can remove the else block as this should never be the case!
+            // this._observable.fire('no-share', {
+            //     nonce: nonceRange.maxNonce
+            // });
         }
-        if (this._miningEnabled) {
-            setTimeout(() => this._singleMiner(nonceRange), this._cycleWait);
-        }
+        //@UP the things below update the nonce, don't need this as well.
+        // console.log("7.4--------outside IFELSE", this._activeNonces.length ,  this.poolSize);
+        // if (this._activeNonces.length > this.poolSize) {
+        //     console.log("7.5------inside IF");
+        //     this._activeNonces.splice(this._activeNonces.indexOf(nonceRange), 1);
+        //     return;
+        // } else {
+        //     // console.log("7.6------inside ELSE");
+        //     const newMin = Math.max.apply(null, this._activeNonces.map((a) => a.maxNonce));
+        //     const newRange = {minNonce: newMin, maxNonce: newMin + this._noncesPerRun};
+        //     // console.log("New range before splice", newRange);
+        //     this._activeNonces.splice(this._activeNonces.indexOf(nonceRange), 1, newRange);
+        //     nonceRange = newRange;
+        //     // console.log("New range after splice", newRange);
+        // }
+        
+        //@UP once we run it we dont need to keep caling it or keep the single miner going so we can remove this.
+        // console.log("Exit while of sinlgeMiner");
+        // if (this._miningEnabled) {
+        //     setTimeout(() => this._singleMiner(nonceRange), this._cycleWait);
+        // }
+        this.stop();
     }
 }
 

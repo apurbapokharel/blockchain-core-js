@@ -83,7 +83,7 @@ class ChainData {
         // const superBlockCounts = this.superBlockCounts.copyAndAdd(BlockUtils.getHashDepth(pow));
         // return new ChainData(block, totalDifficulty, totalWork, superBlockCounts);
 
-        //TODO: APU: create new chainData
+        // @UP: create new chainData
         return new ChainData(block);
     }
 

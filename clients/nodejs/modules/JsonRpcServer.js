@@ -55,7 +55,6 @@ class JsonRpcServer {
                 res.end('Nimiq JSON-RPC Server\n');
             } else if (req.method === 'POST') {
                 if (JsonRpcServer._authenticate(req, res, config.username, config.password)) {
-                    res.setHeader('Content-Type', 'application/json');
                     this._onRequest(req, res);
                 }
             } else {
@@ -109,6 +108,7 @@ class JsonRpcServer {
         this._methods.set('getTransactionsByAddress', this.getTransactionsByAddress.bind(this));
         this._methods.set('mempoolContent', this.mempoolContent.bind(this));
         this._methods.set('mempool', this.mempool.bind(this));
+        this._methods.set('messageCount', this.messageCount.bind(this));
         this._methods.set('minFeePerByte', this.minFeePerByte.bind(this));
 
         // Miner
@@ -137,6 +137,10 @@ class JsonRpcServer {
         this._methods.set('getBlockByHash', this.getBlockByHash.bind(this));
         this._methods.set('getBlockByNumber', this.getBlockByNumber.bind(this));
 
+        // @UP For Deliberation
+        this._methods.set('sendMessage', this.sendMessage.bind(this));
+        this._methods.set('nodeAddress', this.nodeAddress.bind(this));
+        this._methods.set('mint', this.mint.bind(this));
         this._methods.set('constant', this.constant.bind(this));
         this._methods.set('log', this.log.bind(this));
 
@@ -197,7 +201,7 @@ class JsonRpcServer {
         const peers = [];
         const addresses = await this._client.network.getAddresses();
         const allPeers = await this._client.network.getPeers();
-
+       
         for (const address of addresses) {
             peers.push(this._infoToPeerObj(allPeers.find(peer => peer.peerAddress.equals(address.peerAddress)), address));
         }
@@ -269,7 +273,7 @@ class JsonRpcServer {
                     case Nimiq.HashedTimeLockedContract.ProofType.REGULAR_TRANSFER: {
                         const hashAlgorithm = tx.proof.hashAlgorithm;
                         const hashDepth = tx.proof.hashDepth;
-                        const hashRoot = Nimiq.Hash.fromAny(tx.proof.hashRoot, hashAlgorithm);
+                        const hashRoot = Nimiq.Hash.fromAny(sendTransactiontx.proof.hashRoot, hashAlgorithm);
                         const preImage = Nimiq.Hash.fromAny(tx.proof.preImage, hashAlgorithm);
 
                         proof = new Nimiq.SerialBuffer(1 + 1 + 1 + 2 * Nimiq.Hash.SIZE.get(hashAlgorithm) + Nimiq.SignatureProof.SINGLE_SIG_SIZE);
@@ -402,6 +406,11 @@ class JsonRpcServer {
         const transactionsPerBucket = stats.countInBuckets;
         transactionsPerBucket.total = stats.count;
         return transactionsPerBucket;
+    }
+
+    async messageCount(){
+        const count = await this._client.mempool.getMessageCount();
+        return count;
     }
 
     minFeePerByte(minFeePerByte) {
@@ -628,7 +637,21 @@ class JsonRpcServer {
         return block ? this._blockToObj(block, includeTransactions) : null;
     }
 
+    // @UP: Deliberation Functions
+    async sendMessage(address, message) {
+        await this._client.sendMessage(message)
+        return true;
+    }
+    //// end deliberation function
 
+    async mint(){
+        await this._miner.mint();
+        return true;
+    }
+    async nodeAddress(){
+        const a = await this._client.network.getOwnAddress()
+        return a._address._publicKey.toHex();        
+    }
     /*
      * Utils
      */

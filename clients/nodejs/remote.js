@@ -437,6 +437,128 @@ async function action(args, rl) {
             console.log(await jsonRpcFetch('mining', args.length > 1 ? isTrue(args[1]) : undefined));
             return;
         }
+        //TODO: RPC methods for deliberation
+        case 'send.message': {
+            const senderAddress = await jsonRpcFetch('nodeAddress');
+            if(args.length == 2){
+                console.log(await jsonRpcFetch('sendMessage', senderAddress, args[1]));
+            }
+            else{
+                console.error('Only 1 argument sent');
+            }
+            return;
+        }
+        case 'message.count': {
+            const messageCount = await jsonRpcFetch('messageCount');
+            console.log("Number of message in mempool", messageCount);
+            return;
+            
+        }
+        case 'node.address': {
+            console.log(await jsonRpcFetch('nodeAddress'));
+            return;
+        }
+        
+        //Sub-Category Deliberation Stats
+        case 'get.deliberations': {
+            if(args.length == 2){
+                const block = await jsonRpcFetch('getBlockByNumber', args[1]);
+                const deliberationData = String(block.extraData);
+
+                const size = deliberationData.length;
+                let a = new Uint8Array(size/2);
+                let b = [];
+                for(i = 0; i<size; i=i+2){
+                    let hexString = deliberationData[i] + deliberationData[i+1];
+                    let d = parseInt(hexString, 16);
+                    b.push(d);
+                }
+
+                for(i = 0; i<b.length; i++){
+                    a[i] = b[i];
+                }
+
+                let res = Nimiq.BufferUtils.toAscii(a);
+                let count = 0;
+                for(let i = 0; i < res.length; i++){
+                    if(res[i] === '.')
+                        count++;
+                }
+                let array = res.split('.');
+                console.log("DELIBERATIONS");
+                console.log(array);
+                return;
+            }
+            else{
+                console.error('Only 1 argument accepted');
+            } 
+        }
+        case 'get.deliberation.time': {
+            // if(args.length == 2){
+            //     const block = await jsonRpcFetch('getBlockByNumber', args[1]);
+            //     const deliberationData = String(block.extraData);
+
+            //     const size = deliberationData.length;
+            //     let a = new Uint8Array(size/2);
+            //     let b = [];
+            //     for(i = 0; i<size; i=i+2){
+            //         let hexString = deliberationData[i] + deliberationData[i+1];
+            //         let d = parseInt(hexString, 16);
+            //         b.push(d);
+            //     }
+
+            //     for(i = 0; i<b.length; i++){
+            //         a[i] = b[i];
+            //     }
+
+            //     let res = Nimiq.BufferUtils.toAscii(a);
+
+            //     let count = 0;
+            //     for(let i = 0; i < res.length; i++){
+            //         if(res[i] === '.')
+            //             count++;
+            //     }
+            //     let array = res.split('.');
+            //     // console.log("DELIBERATIONS");
+            //     // console.log(array, count);
+
+            //     let startTime = array[0].substring(3,13);
+            //     let endTime = array[count-1].substring(3,14);
+            //     let diff = endTime - startTime;
+            //     diff = diff * 1000;
+            //     diff = Math.floor(diff / 1000);
+            //     var secs_diff = diff % 60;
+            //     diff = Math.floor(diff / 60);
+            //     var mins_diff = diff % 60;
+            //     diff = Math.floor(diff / 60);
+            //     var hours_diff = diff % 24;
+            //     diff = Math.floor(diff / 24);
+
+            //     console.log("Deliberation time");
+            //     console.log(hours_diff + " hours " + mins_diff + " minutes " + secs_diff + " seconds");
+            //     return;
+            // }
+            // else{
+            //     console.error('Only 1 argument accepted');
+            // } 
+
+            
+        }
+        case 'get.deliberation.size': {
+            if(args.length == 2){
+                const block = await jsonRpcFetch('getBlockByNumber', args[1]);
+                console.log(block.size + " Bytes");
+                return;
+            }
+            else{
+                console.error('Only 1 argument accepted');
+            } 
+        }
+        //TODO: end deliberation methods
+        case 'mint': {
+            console.log(await jsonRpcFetch('mint'));
+            return;
+        }
         case 'mining.hashrate': {
             console.log(await jsonRpcFetch('hashrate'));
             return;

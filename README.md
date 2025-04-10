@@ -1,80 +1,28 @@
-# Nimiq Blockchain [![Build Status](https://github.com/nimiq/core-js/actions/workflows/build%2Btest.yml/badge.svg?branch=master)](https://github.com/nimiq/core-js/actions?query=branch%3Amaster)
+# For details about the original repo please refer to NIMIQ.md file in this repo.
+## Please note that as of Jan 25, 2025 core-js has been archived and nimiq moved to a rust based PoS implementation my work on core-js started from September 2023.
 
-**[Nimiq](https://nimiq.com/)** is a frictionless payment protocol for the web.
+# Notice
+This is a Proof of concept implementaion and is far from being a production ready implementation. Heaps of work is necessary to be used in production. Search for tag @UP to see the comments, notes, TODO, FIXME I've left for readers and potential forkers. Will try and write a medium article that explain all of the work I did, my approach, the way I solved it but make no gurantee.
 
-[Nimiq PoS has been launched](https://www.nimiq.com/blog/nimiq-proof-of-stake-is-now-live/). This repository is archived. You can use the [Nimiq PoS Rust implementation](https://github.com/nimiq/core-rs-albatross/) instead.
-
-## Resources
-
-- [Nimiq White Paper](https://nimiq.com/whitepaper/): High-level introduction of the Nimiq payment protocol.
-- [Nimiq Developer Reference](https://nimiq-network.github.io/developer-reference/): Details of the protocol architecture.
-- [Core API Documentation](https://doc.esdoc.org/github.com/nimiq/core-js/): Documentation of the Nimiq Core library API.
-- [Node.js Client Documentation](doc/nodejs-client.md): Usage and configuration documentation for the Nimiq Node.js Client.
-- [JSON-RPC Client Documentation](doc/json-rpc-client.md): Usage instructions for the Nimiq JSON-RPC Client.
-- [Docker Documentation](doc/docker.md): Instructions on setting up a Nimiq Node using Docker.
-- [Packaging Documentation](doc/linux-packaging.md): Instructions on how to build binary packages for Linux (.deb and/or RPM) from this source code.
-
-## Demo
-Check out our [Testnet](https://nimiq-testnet.com).
-
-## Packages
-### Prebuilt binary packages
-For users looking to run a standalone Nimiq node (which is also capable of mining), see our [Downloads page](https://nimiq.com/#downloads) for installable Linux and Windows binary packages.
-
-### NPM Packages
-For developers looking to include Nimiq support on their applications, there are two npm packages available:
-
-- [`@nimiq/core`](https://www.npmjs.com/package/@nimiq/core): Module for use in node.js applications.
-- [`@nimiq/core-web`](https://www.npmjs.com/package/@nimiq/core-web): Module for use in client-side (browser) applications (includes the same files that are available from [our CDN](#getting-started)).
-
-## Quickstart
-
+# Prereqs
 1. Install [Node.js](https://nodejs.org) >= v16.20.2.
 2. On Ubuntu and Debian, install `git` and `build-essential`: `sudo apt-get install -y git build-essential`.
     - On other Linux systems, install `git`, `python3`, `make`, `gcc` and `gcc-c++`.
     - For MacOS or Windows, [check here for git](https://git-scm.com/downloads) and [here for compilation tools](https://github.com/nodejs/node-gyp#on-mac-os-x).
 3. Install `yarn` globally: `sudo npm install -g yarn`.
 4. Install `gulp` globally:  `yarn global add gulp`.
-5. Clone this repository: `git clone https://github.com/nimiq/core-js`.
-6. Build the project: `cd core-js && yarn && yarn build`.
-7. Open `clients/browser/index.html` in your browser.
+5. Clone this repository.
 
-## Web Developers
-### Simple Web Application on top of Nimiq
-A good way to get started is to have a look at [the most simple web application on top of the Nimiq Blockchain](https://demo.nimiq.com/).
+# Steps to run blockchain node
 
-### Getting Started
-Follow the [Quickstart](#quickstart) guide or make use of our CDN:
+1. Build the project: `cd core-js && yarn && yarn build`.
+2. This will build a file node.js inside the dist folder, which will have all the code from source.
+3. `cd clients/nodejs` and `node index.js --config=sample.conf`
+4. This will spin up a blockchain on port specified inside sample.conf and will use code from dist/node.js
 
-```
-<script src="https://cdn.nimiq.com/latest/nimiq.js"></script>
-```
+# Steps to send deliberation messages manually
 
-## Browser client
-
-Open `clients/browser/index.html` in your browser or include `<script src="dist/nimiq.js"></script>` in your project.
-
-## Node.js client
-
-To run a Node.js client you will need a **publicly routable IP**, **Domain**, and **SSL Certificate** (get a free certificate at [letsencrypt.org](https://letsencrypt.org/)). Start the client by running `clients/nodejs/nimiq` with the respective [configuration](doc/nodejs-client.md).
-
-## Test and Build
-
-### Run Testsuite
-- `yarn test` runs browser and Node.js tests.
-- `yarn test-browser` runs the testsuite in your browser only.
-- `yarn test-node` runs the testsuite in Node.js only.
-
-### Run ESLint
-`yarn lint` runs the ESLint javascript linter.
-
-### Build
-Executing `yarn build` concatenates all sources into `dist/{web,web-babel,web-crypto,node}.js`
-
-## Contribute
-
-If you'd like to contribute to the development of Nimiq please follow our [Code of Conduct](/.github/CODE_OF_CONDUCT.md) and [Contributing Guidelines](/.github/CONTRIBUTING.md).
-
-## License
-
-This project is under the [Apache License 2.0](./LICENSE.md).
+1. Once the node is running, in another terminal instance `node remote.js send.message "your message"`
+2. Play around with different nodes and send message in the same way
+3. To check the total number of messages in order to verify consistency `node remote.js message.count`
+4. To finalize the deliberation and mine the block with the deliberations stored in the block `node remote.js mining.enabled true`

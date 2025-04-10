@@ -6,6 +6,7 @@
 /clients/nodejs/peer-key
 /clients/nodejs/wallet
 /clients/nodejs/localhost.*
+/clients/nodejs/sample.conf
 /dist/nimiq*
 /dist/worker.js*
 /dist/web*

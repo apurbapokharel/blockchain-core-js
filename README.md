@@ -13,8 +13,12 @@ This is a Proof of concept implementaion and is far from being a production read
 4. Install `gulp` globally:  `yarn global add gulp`.
 5. Clone this repository.
 
-# Steps to run blockchain node
+### Ensure that node version is 20.19.0 and npm version is 10.8.2 (Use nvm install 20.19.0 and nvm use 20.19.0). I used a newer version of node 23.6.1 and yarn build did not work.
+### GNU Make - 4.3
+### GCC - 11.4.0
+### G++ - 11.4.0
 
+# Steps to run blockchain node
 1. Build the project: `cd core-js && yarn && yarn build`.
 2. This will build a file node.js inside the dist folder, which will have all the code from source.
 3. `cd clients/nodejs` and `node index.js --config=sample.conf`

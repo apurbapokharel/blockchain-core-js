@@ -438,6 +438,13 @@ async function action(args, rl) {
             return;
         }
         //TODO: RPC methods for deliberation
+        case 'init.deliberation': {
+            const config = JSON.parse(argv.config);
+            //@UP: add checks to ensure that config has all the necessary parameters
+            const senderAddress = await jsonRpcFetch('nodeAddress');
+            console.log(await jsonRpcFetch('initDeliberation', senderAddress, config));
+            return;
+        }
         case 'send.message': {
             const senderAddress = await jsonRpcFetch('nodeAddress');
             if(args.length == 2){

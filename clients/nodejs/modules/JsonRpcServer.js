@@ -138,6 +138,7 @@ class JsonRpcServer {
         this._methods.set('getBlockByNumber', this.getBlockByNumber.bind(this));
 
         // @UP For Deliberation
+        this._methods.set('initDeliberation', this.initDeliberation.bind(this));
         this._methods.set('sendMessage', this.sendMessage.bind(this));
         this._methods.set('nodeAddress', this.nodeAddress.bind(this));
         this._methods.set('mint', this.mint.bind(this));
@@ -638,6 +639,11 @@ class JsonRpcServer {
     }
 
     // @UP: Deliberation Functions
+    async initDeliberation(address, json) {
+        await this._client.initDeliberation(json)
+        return true;
+    }
+
     async sendMessage(address, message) {
         await this._client.sendMessage(message)
         return true;

@@ -20194,6 +20194,102 @@ class DeliberationMessage {
     }
 }
 Class.register(DeliberationMessage);
+
+class InitMessage{
+    /**
+     * @param {String} problem
+     * @param {Array<Uint32>} rounds
+     * @param {Array<Uint32>} turns
+     * @param {Array.<String(PublicKey)>} participants
+     * Additional params not included
+     * @param {Uint32} timeStamp
+     * @param {Uint32} completionTimeStamp
+     * @param {Uint32} confidenceInConsensus
+    */
+    constructor(problem, rounds, turns, participants){
+        this._decodedProblem = problem;
+        this._rounds = rounds;
+        this._turns = turns;
+        this._participants = participants;
+    }
+
+    encodeMessage(){
+        let encoder = new TextEncoder();
+        this._encodedProblem = encoder.encode(this._decodedProblem);
+        this._lengthOfProblem = this._encodedProblem.length;
+
+        this._lengthOfParticipants = this._participants.length;        
+        let encodedParticipantsArray = this._participants.map(str => {
+            return encoder.encode(str);
+        });
+        this._totalLength = this._lengthOfParticipants * 64;
+        this._encodedParticipants = new Uint8Array(this._totalLength);
+        let offset = 0;
+        for (const arr of encodedParticipantsArray) {
+            this._encodedParticipants.set(arr, offset);
+            offset += arr.length;
+        }                
+    }
+
+    // hash() {
+    //     // Exclude the signature, we don't want transactions to be malleable.
+    //     this._hash = this._hash || Hash.light(this.serialize());
+    //     return this._hash;
+    // }
+
+    static unserialize(buf) {
+        let decoder = new TextDecoder();
+        const length = buf.readUint8();
+        const uint8Array = new Uint8Array(length);
+        for (let i = 0; i < length; i++) {
+            uint8Array[i] = buf.readUint8();
+        }
+        const rounds = buf.readUint32();
+        const turns = buf.readUint32();
+        const length2 = buf.readUint8();
+        const uint8Array2 = new Uint8Array(length2);
+        for (let i = 0; i < length2; i++) {
+            uint8Array2[i] = buf.readUint8();
+        }
+        const result = [];
+        for (let i = 0; i < length2; i += 64) {
+            result.push(uint8Array2.slice(i, i + chunkSize));
+        }
+        let participants = [];
+        for(const arr of result){
+            participants.push(decoder.decode(arr));
+        }
+        let decodedProblem = decoder.decode(uint8Array);
+        return new DeliberationMessage(decodedProblem, rounds, turns, participants);
+    }
+
+    serialize(buf) {
+        buf = buf || new SerialBuffer(this.serializedSize);
+        buf.writeUint8(this._lengthOfProblem);
+        for (let i = 0; i < this._lengthOfProblem; i++) {
+            buf.writeUint8(this._encodedProblem[i]);
+        }
+        buf.writeUint32(this._rounds);
+        buf.writeUint32(this._turns);
+        buf.writeUint8(this._totalLength);
+        for (let i = 0; i < this._totalLength; i++) {
+            buf.writeUint8(this._encodedParticipants[i]);
+        }
+        return buf;
+    }
+
+     /** @type {number} */
+     get serializedSize() {
+        return 1
+            + 1 * this._lengthOfProblem
+            + 4 /*rounds*/
+            + 4 /*turns*/
+            + 1
+            + 1 * this._totalLength /* size of array = length * space for each 8 bit (1) */
+    }
+}
+Class.register(InitMessage);
+
 class InvRequestManager {
     constructor() {
         /** @type {HashMap.<InvVector, {current: BaseConsensusAgent, waiting: Set.<BaseConsensusAgent>}>} */
@@ -21285,6 +21381,9 @@ class BaseConsensusAgent extends Observable {
 
     }
 
+    // async _onInitDeli(msg){
+    //     msg.message.
+    // }
     /**
      * @param {Hash} hash
      * @param {Transaction} transaction
@@ -22779,12 +22878,12 @@ class BaseConsensus extends Observable {
     }
 
     sendInitMessage(msg){
-        // this.fire('message-added', msg)
         // Don't relay message if we are not synced yet.
         if (!this._established) return;
 
         for (const agent of this._agents.valueIterator()) {
-            agent.relayMessage(msg);
+            // agent.relayMessage(msg);
+            agent._peer.channel._send(msg)
         }
     }
     
@@ -28624,7 +28723,7 @@ Message.Type = {
     REJECT:     10,
     SUBSCRIBE:  11,
     MSG:        12,
-
+    INITMSG:    13,
     ADDR:       20,
     GET_ADDR:   21,
     PING:       22,
@@ -31290,7 +31389,9 @@ MessageFactory.CLASSES[Message.Type.NOT_FOUND] = NotFoundMessage;
 MessageFactory.CLASSES[Message.Type.BLOCK] = BlockMessage;
 MessageFactory.CLASSES[Message.Type.HEADER] = HeaderMessage;
 MessageFactory.CLASSES[Message.Type.TX] = TxMessage;
+// @UP: 
 MessageFactory.CLASSES[Message.Type.MSG] = DeliMessage;
+MessageFactory.CLASSES[Message.Type.INITMSG] = InitMessage;
 MessageFactory.CLASSES[Message.Type.GET_BLOCKS] = GetBlocksMessage;
 MessageFactory.CLASSES[Message.Type.MEMPOOL] = MempoolMessage;
 MessageFactory.CLASSES[Message.Type.REJECT] = RejectMessage;
@@ -36326,7 +36427,9 @@ PeerChannel.Event[Message.Type.GET_BLOCKS] = 'get-blocks';
 PeerChannel.Event[Message.Type.BLOCK] = 'block';
 PeerChannel.Event[Message.Type.HEADER] = 'header';
 PeerChannel.Event[Message.Type.TX] = 'tx';
+//@UP
 PeerChannel.Event[Message.Type.MSG] = 'msg';
+PeerChannel.Event[Message.Type.INITMSG] = 'init-deli';
 PeerChannel.Event[Message.Type.MEMPOOL] = 'mempool';
 PeerChannel.Event[Message.Type.REJECT] = 'reject';
 PeerChannel.Event[Message.Type.SUBSCRIBE] = 'subscribe';
@@ -43047,12 +43150,24 @@ class Client {
         //TODO: @UP handle the switch cases as handled above in sendTransaction
     }
 
-    async initDeliberation(deliParams){
-        let address = await this._network.getOwnAddress()        
-        let msg = new InitMessage(...deliParams, Math.floor(Date.now()/1000));        
+    async initDeliberation(deliParams){        
+        const problem = deliParams.problem;
+        const rounds = deliParams.rounds;
+        const turns = deliParams.turns;
+
+        let address = (await this._network.getOwnAddress())._address._publicKey.toHex();            
+        let peerAddresses = await this._network.getAddresses();  
+        let arrayOfPeers = [];
+        arrayOfPeers.push(address);
+        for (const address of peerAddresses){            
+            arrayOfPeers.push(address._address._publicKey.toHex());  
+        }
+        console.log(arrayOfPeers);
+        
+        let msg = new InitMessage(problem, rounds, turns, arrayOfPeers);        
         msg.encodeMessage()
         const consensus = await this._consensus;
-        // let consensusResult = await consensus.sendInitMessage(msg);
+        let consensusResult = await consensus.sendInitMessage(msg);
         //TODO: @UP handle the switch cases as handled above in sendTransaction
     }
 

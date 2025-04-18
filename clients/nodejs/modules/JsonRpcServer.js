@@ -5,6 +5,7 @@ const JSON5 = require('json5');
 const btoa = require('btoa');
 const NodeUtils = require('./NodeUtils.js');
 const Nimiq = require('../../../dist/node.js');
+const { log } = require('console');
 
 class JsonRpcServer {
     /**
@@ -640,6 +641,7 @@ class JsonRpcServer {
 
     // @UP: Deliberation Functions
     async initDeliberation(address, json) {
+        console.log(json);
         await this._client.initDeliberation(json)
         return true;
     }

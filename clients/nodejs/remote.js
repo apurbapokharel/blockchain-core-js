@@ -438,6 +438,7 @@ async function action(args, rl) {
             return;
         }
         //TODO: RPC methods for deliberation
+        //node remote.js init.deliberation --config='{"problem": "some probelm", "rounds": "2", "turns": "1"}'
         case 'init.deliberation': {
             const config = JSON.parse(argv.config);
             //@UP: add checks to ensure that config has all the necessary parameters

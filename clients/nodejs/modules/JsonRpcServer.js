@@ -642,12 +642,12 @@ class JsonRpcServer {
     // @UP: Deliberation Functions
     async initDeliberation(address, json) {
         // console.log(json);
-        await this._client.initDeliberation(json)
+        await this._client.initDeliberation(json);
         return true;
     }
 
     async sendMessage(address, message) {
-        await this._client.sendMessage(message)
+        await this._client.sendMessage(message);
         return true;
     }
     //// end deliberation function
@@ -657,7 +657,7 @@ class JsonRpcServer {
         return true;
     }
     async nodeAddress(){
-        const a = await this._client.network.getOwnAddress()
+        const a = await this._client.network.getOwnAddress();
         return a._address._publicKey.toHex();        
     }
     /*

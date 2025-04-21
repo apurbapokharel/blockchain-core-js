@@ -641,7 +641,7 @@ class JsonRpcServer {
 
     // @UP: Deliberation Functions
     async initDeliberation(address, json) {
-        console.log(json);
+        // console.log(json);
         await this._client.initDeliberation(json)
         return true;
     }

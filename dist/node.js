@@ -786,8 +786,8 @@ class DataChannel extends Observable {
 }
 
 DataChannel.CHUNK_SIZE_MAX = 1024 * 16; // 16 kb
-//@UP Increasing from 10 to 1000
-DataChannel.MESSAGE_SIZE_MAX = 1000 * 1024 * 1024; // 100 mb
+//@UP Increasing the size from 10 to 1000. Bit of an overkill but this is a Proof Of Concept
+DataChannel.MESSAGE_SIZE_MAX = 1000 * 1024 * 1024; // 1000 mb
 DataChannel.CHUNK_TIMEOUT = 1000 * 5; // 5 seconds
 DataChannel.MESSAGE_TIMEOUT = (DataChannel.MESSAGE_SIZE_MAX / DataChannel.CHUNK_SIZE_MAX) * DataChannel.CHUNK_TIMEOUT;
 Class.register(DataChannel);
@@ -1150,7 +1150,6 @@ class WebSocketFactory {
 Class.register(WebSocketFactory);
 
 const URL = require('url');
-const { json } = require('stream/consumers');
 
 class HttpRequest {
     /**
@@ -1670,6 +1669,134 @@ class Time {
 }
 Class.register(Time);
 
+class Deliberation extends Observable{
+    /**
+     * @param {String} problem
+     * @param {Array<Uint32>} rounds
+     * @param {Array<Uint32>} turns
+     * @param {Array.<String(PublicKey)>} participants
+    */
+    constructor(problem, rounds, turns, participants){
+        super();
+        this._problem = problem;
+        this._totalRound = rounds;
+        this._totalTurn = turns;
+        this._participants = participants;
+        this._currentRound = 1;
+        this._currentTurn = 1;
+        this._speakerIndex = 0;
+        this._isEnd = false;
+    }
+
+    // generateUtterance(){
+
+    // }
+    _error(msg) {
+        this.fire('error', msg, this);
+        Log.e(Deliberation, msg);
+    }
+
+    /**
+     * 
+     * @param {DeliberationMessage} msg 
+     */
+    registerUtterance(msg){
+        // check if the sender is the currentSpeaker
+        this.printDeliberationState();
+        const sender = msg.senderPubKey.toHex();
+        console.log(sender, this.participants[this.speakerIndex], sender !== this.participants[this.speakerIndex]);
+        
+        if (sender !== this.participants[this.speakerIndex]){
+            this._error('Message/Utterance speaking order violated');
+            return;
+        }
+        // check if the deliberation is not already terminated
+        if(this.isEnd || this.currentRound > this.totalRound){
+            this._error('Deliberation already terminated');
+            return;
+        }
+        // check if the time has not exceeded
+        // other checks
+
+        this.increaseSpeakerIndex();
+        this.printDeliberationState();
+    }
+
+    // Only for testing
+    printDeliberationState() {
+        console.log("Current Round:", this._currentRound);
+        console.log("Current Turn:", this._currentTurn);
+        console.log("Speaker Index:", this._speakerIndex);
+        console.log("Is Ended:", this._isEnd);
+    }
+
+    increaseRound(){
+        this._currentRound +=1;
+
+        if(this.currentRound > this.totalRound){
+            this.endDeliberation();
+        }
+    }
+
+    increaseTurn(){
+        this._currentTurn +=1;
+
+        if(this.currentTurn > this.totalTurn){
+            this.increaseRound();
+        }
+    }
+
+    endDeliberation(){
+        this._isEnd = true;
+    }
+
+    increaseSpeakerIndex(){
+        this._speakerIndex += 1;
+        if(this.speakerIndex === this.participants.length){
+            if(this.currentRound === 2){
+                this.increaseTurn();
+            }
+            else{
+                this.increaseRound();
+            }
+            this._speakerIndex = 0;
+        }
+    }
+
+    get problem(){
+        return this._problem;
+    }
+
+    get totalRound(){
+        return this._totalRound;
+    }
+
+    get totalTurn(){
+        return this._totalTurn;
+    }
+
+    get participants(){
+        return this._participants;
+    }
+
+    get currentRound(){
+        return this._currentRound;
+    }
+
+    get currentTurn(){
+        return this._currentTurn;
+    }
+
+    get speakerIndex(){
+        return this._speakerIndex;
+    }
+
+    get isEnd(){
+        return this._isEnd;
+    }
+    
+} 
+Class.register(Deliberation);
 class EventLoopHelper {
     static webYield() {
         return PlatformUtils.isWeb() ? EventLoopHelper.yield() : Promise.resolve();
@@ -20207,7 +20334,6 @@ class DeliberationMessage {
     }
 }
 Class.register(DeliberationMessage);
-
 class InvRequestManager {
     constructor() {
         /** @type {HashMap.<InvVector, {current: BaseConsensusAgent, waiting: Set.<BaseConsensusAgent>}>} */
@@ -21303,7 +21429,6 @@ class BaseConsensusAgent extends Observable {
 
         // Mark object as processed.
         this._onObjectProcessed(vector);
-
     }
 
     async _onInitDeli(msg){
@@ -22123,135 +22248,6 @@ class FreeTransactionVector {
         return this._serializedSize;
     }
 }
-
-class Deliberation extends Observable{
-    /**
-     * @param {String} problem
-     * @param {Array<Uint32>} rounds
-     * @param {Array<Uint32>} turns
-     * @param {Array.<String(PublicKey)>} participants
-    */
-    constructor(problem, rounds, turns, participants){
-        super();
-        this._problem = problem;
-        this._totalRound = rounds;
-        this._totalTurn = turns;
-        this._participants = participants;
-        this._currentRound = 1;
-        this._currentTurn = 1;
-        this._speakerIndex = 0;
-        this._isEnd = false;
-    }
-
-    // generateUtterance(){
-
-    // }
-    _error(msg) {
-        this.fire('error', msg, this);
-        Log.e(Deliberation, msg);
-    }
-
-    /**
-     * 
-     * @param {DeliberationMessage} msg 
-     */
-    registerUtterance(msg){
-        // check if the sender is the currentSpeaker
-        this.printDeliberationState();
-        const sender = msg.senderPubKey.toHex();
-        console.log(sender, this.participants[this.speakerIndex], sender !== this.participants[this.speakerIndex]);
-        
-        if (sender !== this.participants[this.speakerIndex]){
-            this._error('Message/Utterance speaking order violated');
-            return;
-        }
-        // check if the deliberation is not already terminated
-        if(this.isEnd || this.currentRound > this.totalRound){
-            this._error('Deliberation already terminated');
-            return;
-        }
-        // check if the time has not exceeded
-        // other checks
-
-        this.increaseSpeakerIndex();
-        this.printDeliberationState();
-    }
-
-    // Only for testing
-    printDeliberationState() {
-        console.log("Current Round:", this._currentRound);
-        console.log("Current Turn:", this._currentTurn);
-        console.log("Speaker Index:", this._speakerIndex);
-        console.log("Is Ended:", this._isEnd);
-    }
-
-    increaseRound(){
-        this._currentRound +=1;
-
-        if(this.currentRound > this.totalRound){
-            this.endDeliberation();
-        }
-    }
-
-    increaseTurn(){
-        this._currentTurn +=1;
-
-        if(this.currentTurn > this.totalTurn){
-            this.increaseRound();
-        }
-    }
-
-    endDeliberation(){
-        this._isEnd = true;
-    }
-
-    increaseSpeakerIndex(){
-        this._speakerIndex += 1;
-        if(this.speakerIndex === this.participants.length){
-            if(this.currentRound === 2){
-                this.increaseTurn();
-            }
-            else{
-                this.increaseRound();
-            }
-            this._speakerIndex = 0;
-        }
-    }
-
-    get problem(){
-        return this._problem;
-    }
-
-    get totalRound(){
-        return this._totalRound;
-    }
-
-    get totalTurn(){
-        return this._totalTurn;
-    }
-
-    get participants(){
-        return this._participants;
-    }
-
-    get currentRound(){
-        return this._currentRound;
-    }
-
-    get currentTurn(){
-        return this._currentTurn;
-    }
-
-    get speakerIndex(){
-        return this._speakerIndex;
-    }
-
-    get isEnd(){
-        return this._isEnd;
-    }
-    
-} 
-Class.register(Deliberation);
 
 /**
  * @abstract
@@ -28784,6 +28780,7 @@ Message.Type = {
     MEMPOOL:    9,
     REJECT:     10,
     SUBSCRIBE:  11,
+    //@UP
     MSG:        12,
     INITMSG:    13,
     ADDR:       20,
@@ -28870,7 +28867,6 @@ class DeliMessage extends Message{
     }
 }
 Class.register(DeliMessage)
-
 class InitMessage extends Message{
     /**
      * @param {String} problem
@@ -28970,102 +28966,6 @@ class InitMessage extends Message{
     }
 }
 Class.register(InitMessage);
-
-// class InitMessage extends Message{
-//     /**
-//      * @param {String} problem
-//      * @param {Array<Uint32>} rounds
-//      * @param {Array<Uint32>} turns
-//      * @param {Array.<String(PublicKey)>} participants
-//      * Additional params not included
-//      * @param {Uint32} timeStamp
-//      * @param {Uint32} completionTimeStamp
-//      * @param {Uint32} confidenceInConsensus
-//     */
-//     constructor(participants){
-//         super(Message.Type.INITMSG);
-//         this._participants = participants;
-
-//     }
-
-//     encodeMessage(){
-//         let encoder = new TextEncoder();
-//         // this._encodedProblem = encoder.encode(this._decodedProblem);
-//         // this._lengthOfProblem = this._encodedProblem.length;
-//         this._lengthOfParticipants = this._participants.length;        
-//         let encodedParticipantsArray = this._participants.map(str => {
-//             return encoder.encode(str);
-//         });
-//         this._totalLength = this._lengthOfParticipants * 64;
-//         this._encodedParticipants = new Uint8Array(this._totalLength);
-//         let offset = 0;
-//         for (const arr of encodedParticipantsArray) {
-//             this._encodedParticipants.set(arr, offset);
-//             offset += arr.length;
-//         } 
-
-//         // console.log(this._participants);
-//         // let decoder = new TextDecoder();
-//         // const length2 = this._totalLength
-//         // const uint8Array2 = this._encodedParticipants
-
-//         // const result = [];
-//         // for (let i = 0; i < length2; i += 64) {
-//         //     result.push(uint8Array2.slice(i, i + 64));
-//         // }
-//         // let participants = [];
-//         // for(const arr of result){
-//         //     participants.push(decoder.decode(arr));
-//         // }
-//         // console.log(participants);
-        
-//     }
-
-//     // hash() {
-//     //     // Exclude the signature, we don't want transactions to be malleable.
-//     //     this._hash = this._hash || Hash.light(this.serialize());
-//     //     return this._hash;
-//     // }
-
-//     static unserialize(buf) {
-//         Message.unserialize(buf);
-//         let decoder = new TextDecoder();
-//         const length2 = buf.readUint8();
-//         const uint8Array2 = new Uint8Array(length2);
-//         for (let i = 0; i < length2; i++) {
-//             uint8Array2[i] = buf.readUint8();
-//         }
-//         const result = [];
-//         for (let i = 0; i < length2; i += 64) {
-//             result.push(uint8Array2.slice(i, i + 64));
-//         }
-//         let participants = [];
-//         for(const arr of result){
-//             participants.push(decoder.decode(arr));
-//         }
-//         return new InitMessage(participants);
-//     }
-
-//     serialize(buf) {
-//         buf = buf || new SerialBuffer(this.serializedSize);
-//         super.serialize(buf);
-//         buf.writeUint8(this._totalLength);
-//         for (let i = 0; i < this._totalLength; i++) {
-//             buf.writeUint8(this._encodedParticipants[i]);
-//         }
-//         super._setChecksum(buf);
-//         return buf;
-//     }
-
-//      /** @type {number} */
-//      get serializedSize() {
-//         return super.serializedSize 
-//         + 1
-//         + 1 * this._totalLength;
-//         }
-// }
-// Class.register(InitMessage);
-
 class AddrMessage extends Message {
     /**
      * @param {Array.<PeerAddress>} addresses
@@ -31647,7 +31547,7 @@ MessageFactory.CLASSES[Message.Type.NOT_FOUND] = NotFoundMessage;
 MessageFactory.CLASSES[Message.Type.BLOCK] = BlockMessage;
 MessageFactory.CLASSES[Message.Type.HEADER] = HeaderMessage;
 MessageFactory.CLASSES[Message.Type.TX] = TxMessage;
-// @UP: 
+//@UP
 MessageFactory.CLASSES[Message.Type.MSG] = DeliMessage;
 MessageFactory.CLASSES[Message.Type.INITMSG] = InitMessage;
 MessageFactory.CLASSES[Message.Type.GET_BLOCKS] = GetBlocksMessage;
@@ -43410,7 +43310,7 @@ class Client {
         let consensusResult = await consensus.sendMessage(msg);
         //TODO: @UP handle the switch cases as handled above in sendTransaction
     }
-
+    
     async initDeliberation(deliParams){        
         const problem = deliParams.problem;
         const rounds = deliParams.rounds;
@@ -43430,10 +43330,6 @@ class Client {
         //TODO: @UP handle the switch cases as handled above in sendTransaction
     }
 
-    // async getDeliberationDetails(){
-
-    // }
-    
     /**
      * @param {BlockListener} listener
      * @return {Promise.<Handle>}

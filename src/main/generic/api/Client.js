@@ -869,6 +869,25 @@ class Client {
         let consensusResult = await consensus.sendMessage(msg);
         //TODO: @UP handle the switch cases as handled above in sendTransaction
     }
+    
+    async initDeliberation(deliParams){        
+        const problem = deliParams.problem;
+        const rounds = deliParams.rounds;
+        const turns = deliParams.turns;
+
+        let address = (await this._network.getOwnAddress())._address._publicKey.toHex();            
+        let peerAddresses = await this._network.getAddresses();  
+        let arrayOfPeers = [];
+        arrayOfPeers.push(address);
+        for (const address of peerAddresses){            
+            arrayOfPeers.push(address._address._publicKey.toHex());  
+        }        
+        let msg = new InitMessage(problem, rounds, turns, arrayOfPeers);        
+        msg.encodeMessage()
+        const consensus = await this._consensus;
+        let consensusResult = await consensus.sendInitMessage(msg);
+        //TODO: @UP handle the switch cases as handled above in sendTransaction
+    }
 
     /**
      * @param {BlockListener} listener

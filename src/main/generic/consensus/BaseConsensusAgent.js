@@ -107,12 +107,18 @@ class BaseConsensusAgent extends Observable {
         /** @type {Set.<{obj: Observable, type: string, id: number}>} */
         this._listenersToDisconnect = new Set();
 
+        //@UP: 
+        /** @type {Deliberation} */
+        this._deliberation = new Deliberation();
+
         // Listen to consensus messages from the peer.
         this._onToDisconnect(peer.channel, 'inv', msg => this._onInv(msg));
         this._onToDisconnect(peer.channel, 'block', msg => this._onBlock(msg));
         this._onToDisconnect(peer.channel, 'header', msg => this._onHeader(msg));
         this._onToDisconnect(peer.channel, 'tx', msg => this._onTx(msg));
         this._onToDisconnect(peer.channel, 'msg', msg => this._onMsg(msg));
+        this._onToDisconnect(peer.channel, 'init-deli', msg => this._onInitDeli(msg));
+        this._onToDisconnect(peer.channel, 'before-init', msg => this._beforeInit(msg));
         this._onToDisconnect(peer.channel, 'not-found', msg => this._onNotFound(msg));
 
         this._onToDisconnect(peer.channel, 'subscribe', msg => this._onSubscribe(msg));
@@ -288,6 +294,7 @@ class BaseConsensusAgent extends Observable {
     }
 
     relayMessage(message) {
+        this._deliberation.registerUtterance(message);
         // console.log("relay message");
         // @UP: Dont know what this means but; Only relay message if it matches the peer's subscription.
         
@@ -1005,7 +1012,18 @@ class BaseConsensusAgent extends Observable {
 
         // Mark object as processed.
         this._onObjectProcessed(vector);
+    }
 
+    async _onInitDeli(msg){
+        if (this._deliberation.problem === undefined || this._deliberation.isEnd){
+            this._deliberation = new Deliberation(msg._decodedMessage, msg._rounds, msg._turns, msg._participants)
+        }
+    }
+
+    async _beforeInit(msg){
+        if (this._deliberation.problem === undefined || this._deliberation.isEnd){
+            this._deliberation = new Deliberation(msg._decodedMessage, msg._rounds, msg._turns, msg._participants)
+        }
     }
 
     /**

@@ -31,7 +31,9 @@ MessageFactory.CLASSES[Message.Type.NOT_FOUND] = NotFoundMessage;
 MessageFactory.CLASSES[Message.Type.BLOCK] = BlockMessage;
 MessageFactory.CLASSES[Message.Type.HEADER] = HeaderMessage;
 MessageFactory.CLASSES[Message.Type.TX] = TxMessage;
+//@UP
 MessageFactory.CLASSES[Message.Type.MSG] = DeliMessage;
+MessageFactory.CLASSES[Message.Type.INITMSG] = InitMessage;
 MessageFactory.CLASSES[Message.Type.GET_BLOCKS] = GetBlocksMessage;
 MessageFactory.CLASSES[Message.Type.MEMPOOL] = MempoolMessage;
 MessageFactory.CLASSES[Message.Type.REJECT] = RejectMessage;

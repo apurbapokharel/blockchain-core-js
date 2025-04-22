@@ -166,8 +166,9 @@ Message.Type = {
     MEMPOOL:    9,
     REJECT:     10,
     SUBSCRIBE:  11,
+    //@UP
     MSG:        12,
-
+    INITMSG:    13,
     ADDR:       20,
     GET_ADDR:   21,
     PING:       22,

@@ -84,6 +84,9 @@ class PeerChannel extends Observable {
      * @private
      */
     _send(msg) {
+        if(msg._type == 13){
+            this.fire('before-init', msg);
+        }
         return this._conn.send(msg.serialize());
     }
 
@@ -517,7 +520,9 @@ PeerChannel.Event[Message.Type.GET_BLOCKS] = 'get-blocks';
 PeerChannel.Event[Message.Type.BLOCK] = 'block';
 PeerChannel.Event[Message.Type.HEADER] = 'header';
 PeerChannel.Event[Message.Type.TX] = 'tx';
+//@UP
 PeerChannel.Event[Message.Type.MSG] = 'msg';
+PeerChannel.Event[Message.Type.INITMSG] = 'init-deli';
 PeerChannel.Event[Message.Type.MEMPOOL] = 'mempool';
 PeerChannel.Event[Message.Type.REJECT] = 'reject';
 PeerChannel.Event[Message.Type.SUBSCRIBE] = 'subscribe';

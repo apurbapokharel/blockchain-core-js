@@ -1,3 +1,7 @@
+// @UP: Notes for adding new messages
+// Deliberation Message will be converted to Delimessage
+// Then the class DeliMessage needs to be included in the following places as well.
+// 1. Class MessageFactory.classes, 2. Class PeerChannel.event, 3. Class Message.Type
 class DeliberationMessage {
   
     /**
@@ -47,12 +51,24 @@ class DeliberationMessage {
         return buf;
     }
 
-     /** @type {number} */
-     get serializedSize() {
+    /** @type {number} */
+    get serializedSize() {
         return this._senderPubKey.serializedSize  
             + /*length*/ 1
             + /*timestamp*/ 4
             + 1 * this._length /* size of array = length * space for each 8 bit (1) */
+    }
+
+    get decodedMessage(){
+        return this._decodedMessage;
+    }
+
+    get senderPubKey(){
+        return this._senderPubKey;
+    }
+
+    get timestamp(){
+        return this._timestamp;
     }
 }
 Class.register(DeliberationMessage);

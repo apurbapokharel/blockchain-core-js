@@ -304,7 +304,8 @@ class DataChannel extends Observable {
 }
 
 DataChannel.CHUNK_SIZE_MAX = 1024 * 16; // 16 kb
-DataChannel.MESSAGE_SIZE_MAX = 10 * 1024 * 1024; // 10 mb
+//@UP Increasing the size from 10 to 1000. Bit of an overkill but this is a Proof Of Concept
+DataChannel.MESSAGE_SIZE_MAX = 1000 * 1024 * 1024; // 1000 mb
 DataChannel.CHUNK_TIMEOUT = 1000 * 5; // 5 seconds
 DataChannel.MESSAGE_TIMEOUT = (DataChannel.MESSAGE_SIZE_MAX / DataChannel.CHUNK_SIZE_MAX) * DataChannel.CHUNK_TIMEOUT;
 Class.register(DataChannel);

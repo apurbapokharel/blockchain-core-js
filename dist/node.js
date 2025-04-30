@@ -1676,7 +1676,7 @@ class Deliberation extends Observable{
      * @param {Array<Uint32>} turns
      * @param {Array.<String(PublicKey)>} participants
     */
-    constructor(problem, rounds, turns, participants){
+    constructor(problem, rounds, turns, participants, isEnded = true){
         super();
         this._problem = problem;
         this._totalRound = rounds;
@@ -1685,7 +1685,7 @@ class Deliberation extends Observable{
         this._currentRound = 1;
         this._currentTurn = 1;
         this._speakerIndex = 0;
-        this._isEnd = false;
+        this._isEnd = isEnded;
     }
 
     // generateUtterance(){
@@ -1701,25 +1701,26 @@ class Deliberation extends Observable{
      * @param {DeliberationMessage} msg 
      */
     registerUtterance(msg){
-        // check if the sender is the currentSpeaker
         this.printDeliberationState();
         const sender = msg.senderPubKey.toHex();
-        console.log(sender, this.participants[this.speakerIndex], sender !== this.participants[this.speakerIndex]);
+        // console.log(sender, this.participants[this.speakerIndex], sender !== this.participants[this.speakerIndex]);
         
-        if (sender !== this.participants[this.speakerIndex]){
-            this._error('Message/Utterance speaking order violated');
-            return;
-        }
         // check if the deliberation is not already terminated
         if(this.isEnd || this.currentRound > this.totalRound){
             this._error('Deliberation already terminated');
-            return;
+            return false;
+        }
+        // check if the sender is the currentSpeaker
+        if (sender !== this.participants[this.speakerIndex]){
+            this._error('Message/Utterance speaking order violated');
+            return false;
         }
         // check if the time has not exceeded
         // other checks
 
         this.increaseSpeakerIndex();
         this.printDeliberationState();
+        return true;
     }
 
     // Only for testing
@@ -19713,6 +19714,10 @@ class Mempool extends Observable {
             await this._evictTransactions();
             await this._restoreTransactions(revertBlocks);
         });
+
+        //@UP: 
+        /** @type {Deliberation} */
+        this._deliberation = new Deliberation();
     }
 
     /**
@@ -19863,6 +19868,9 @@ class Mempool extends Observable {
         if (this._messagesByHash.contains(hash)) {
             return Mempool.ReturnCode.KNOWN;
         }
+
+        // Check if the message is from the expected entity
+        // const status
 
         this._messagesByHash.put(hash, message);
 
@@ -20524,10 +20532,6 @@ class BaseConsensusAgent extends Observable {
         /** @type {Set.<{obj: Observable, type: string, id: number}>} */
         this._listenersToDisconnect = new Set();
 
-        //@UP: 
-        /** @type {Deliberation} */
-        this._deliberation = new Deliberation();
-
         // Listen to consensus messages from the peer.
         this._onToDisconnect(peer.channel, 'inv', msg => this._onInv(msg));
         this._onToDisconnect(peer.channel, 'block', msg => this._onBlock(msg));
@@ -20711,31 +20715,34 @@ class BaseConsensusAgent extends Observable {
     }
 
     relayMessage(message) {
-        this._deliberation.registerUtterance(message);
-        // console.log("relay message");
-        // @UP: Dont know what this means but; Only relay message if it matches the peer's subscription.
-        
-        const vector = InvVector.fromMessage(message);
+        // @UP: If cannot registerUtterance then do not relay message
+        const result = this._deliberation.registerUtterance(message);
+        if(result){
+            // @UP: Dont know what this means but; Only relay message if it matches the peer's subscription.
+            
+            const vector = InvVector.fromMessage(message);
 
-        // Don't relay message to this peer if it already knows it.
-        if (this._knownObjects.contains(vector)) {
-            Log.v(BaseConsensusAgent, `Not sending ${message.hash()} to ${this.peer.peerAddress}: already knows`);
-            return false;
+            // Don't relay message to this peer if it already knows it.
+            if (this._knownObjects.contains(vector)) {
+                Log.v(BaseConsensusAgent, `Not sending ${message.hash()} to ${this.peer.peerAddress}: already knows`);
+                return false;
+            }
+
+            // Relay transaction to peer later.
+            const serializedSize = message.serializedSize;
+            // @UP we can send it as a freeInvVector later
+            this._waitingInvVectors.enqueue(vector);
+
+            // Assume that the peer knows this message after short time.
+            this._timers.setTimeout(`knows-tx-${vector.hash.toBase64()}`, () => {
+                this._knownObjects.add(vector);
+            }, BaseConsensusAgent.KNOWS_OBJECT_AFTER_INV_DELAY);
+
+            Log.v(BaseConsensusAgent, `Sending ${message.hash()} to ${this.peer.peerAddress}`);
+
+            return true;
         }
-
-        // Relay transaction to peer later.
-        const serializedSize = message.serializedSize;
-        // @UP we can send it as a freeInvVector later
-        this._waitingInvVectors.enqueue(vector);
-
-        // Assume that the peer knows this message after short time.
-        this._timers.setTimeout(`knows-tx-${vector.hash.toBase64()}`, () => {
-            this._knownObjects.add(vector);
-        }, BaseConsensusAgent.KNOWS_OBJECT_AFTER_INV_DELAY);
-
-        Log.v(BaseConsensusAgent, `Sending ${message.hash()} to ${this.peer.peerAddress}`);
-
-        return true;
+        return false;
     }
 
 
@@ -21433,13 +21440,13 @@ class BaseConsensusAgent extends Observable {
 
     async _onInitDeli(msg){
         if (this._deliberation.problem === undefined || this._deliberation.isEnd){
-            this._deliberation = new Deliberation(msg._decodedMessage, msg._rounds, msg._turns, msg._participants)
+            this._deliberation = new Deliberation(msg._decodedMessage, msg._rounds, msg._turns, msg._participants, false)
         }
     }
 
     async _beforeInit(msg){
         if (this._deliberation.problem === undefined || this._deliberation.isEnd){
-            this._deliberation = new Deliberation(msg._decodedMessage, msg._rounds, msg._turns, msg._participants)
+            this._deliberation = new Deliberation(msg._decodedMessage, msg._rounds, msg._turns, msg._participants, false)
         }
     }
 
@@ -43323,6 +43330,7 @@ class Client {
         for (const address of peerAddresses){            
             arrayOfPeers.push(address._address._publicKey.toHex());  
         }        
+        console.log(arrayOfPeers);
         let msg = new InitMessage(problem, rounds, turns, arrayOfPeers);        
         msg.encodeMessage()
         const consensus = await this._consensus;

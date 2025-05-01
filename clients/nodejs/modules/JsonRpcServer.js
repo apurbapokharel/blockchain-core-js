@@ -140,6 +140,7 @@ class JsonRpcServer {
 
         // @UP For Deliberation
         this._methods.set('initDeliberation', this.initDeliberation.bind(this));
+        this._methods.set('startDeliberation', this.startDeliberation.bind(this));
         this._methods.set('sendMessage', this.sendMessage.bind(this));
         this._methods.set('nodeAddress', this.nodeAddress.bind(this));
         this._methods.set('mint', this.mint.bind(this));
@@ -645,7 +646,13 @@ class JsonRpcServer {
         await this._client.initDeliberation(json);
         return true;
     }
-
+    
+    async startDeliberation(address) {
+        // console.log(json);
+        await this._client.startDeliberation();
+        return true;
+    }
+    
     async sendMessage(address, message) {
         await this._client.sendMessage(message);
         return true;

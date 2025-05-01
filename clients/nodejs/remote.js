@@ -446,6 +446,11 @@ async function action(args, rl) {
             console.log(await jsonRpcFetch('initDeliberation', senderAddress, config));
             return;
         }
+        case 'start.deliberation': {
+            const senderAddress = await jsonRpcFetch('nodeAddress');
+            console.log(await jsonRpcFetch('startDeliberation', senderAddress));
+            return;
+        }
         case 'send.message': {
             const senderAddress = await jsonRpcFetch('nodeAddress');
             if(args.length == 2){

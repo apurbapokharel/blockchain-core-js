@@ -1150,6 +1150,7 @@ class WebSocketFactory {
 Class.register(WebSocketFactory);
 
 const URL = require('url');
+const { log } = require('console');
 
 class HttpRequest {
     /**
@@ -19674,6 +19675,8 @@ MempoolFilter.CONTRACT_VALUE = 0;
 
 Class.register(MempoolFilter);
 
+const axios = require('axios');
+
 class Mempool extends Observable {
     /**
      * @param {IBlockchain} blockchain
@@ -19704,6 +19707,14 @@ class Mempool extends Observable {
         /** @type {HashMap.<Hash, DeliberationMessage>} */
         this._messagesByHash = new HashMap();
 
+        //@UP: For init delimessage mempool
+        /** @type {HashMap.<Hash, DeliberationInit>} */
+        this._initMessageByHash = new HashMap();
+        
+        //@UP: To keep track of the deliberation state and order
+        /** @type {Deliberation} */
+        this._deliberation = new Deliberation();
+
         // Listen for changes in the blockchain head to evict transactions that have become invalid.
         blockchain.on('head-changed', (block, rebranching) => {
             if (!rebranching) {
@@ -19714,10 +19725,6 @@ class Mempool extends Observable {
             await this._evictTransactions();
             await this._restoreTransactions(revertBlocks);
         });
-
-        //@UP: 
-        /** @type {Deliberation} */
-        this._deliberation = new Deliberation();
     }
 
     /**
@@ -19729,9 +19736,34 @@ class Mempool extends Observable {
         return this._synchronizer.push(() => this._pushTransaction(transaction));
     }
 
+    async generateAndSendMessage(){
+        console.log("before calling llm");
+        const response = await axios.post(`http://127.0.0.1:5000/round1`);
+        console.log("after callling llm", response);
+        
+    }
+
     // @UP
-    pushMessage(message) {
-        return this._synchronizer.push(() => this._pushMessage(message));
+    pushMessage(message) { 
+        if(message instanceof DeliberationInit){
+            if (this._deliberation.problem === undefined || this._deliberation.isEnd){
+                console.log("Init new deliberation");                
+                this._deliberation = new Deliberation(message._decodedProblem, message._rounds, message._turns, message._participants, false)
+                this._synchronizer.push(() => this._pushMessage(message));
+            }
+            else{
+                console.log("No need to init new deliberation");
+            }
+        }
+        if(message instanceof DeliberationMessage){
+            //1. check if the message can be accepted
+                //a. Check if sender is the current speakerIndex
+                // const status = this._deliberation.checkUtterance(message)
+            //2. If the message can be accepted relay the message 
+            //3. Once the message is relayed check if its this peers turn to speak
+                //a. If then generateMsg and pushMessage again
+            return this._synchronizer.push(() => this._pushMessage(message));
+        }
     }
 
     /**
@@ -19864,15 +19896,17 @@ class Mempool extends Observable {
     // @UP
     async _pushMessage(message) {
         // Check if we already know this message.
-        const hash = message.hash();
-        if (this._messagesByHash.contains(hash)) {
+        const hash = message.hash();        
+        if (this._messagesByHash.contains(hash) || this._initMessageByHash.contains(hash)) {
             return Mempool.ReturnCode.KNOWN;
         }
 
-        // Check if the message is from the expected entity
-        // const status
-
-        this._messagesByHash.put(hash, message);
+        if(message instanceof DeliberationInit){
+            this._initMessageByHash.put(hash, message);
+        }
+        else{
+            this._messagesByHash.put(hash, message);
+        }
 
         this.fire('message-added', message);
 
@@ -19943,10 +19977,19 @@ class Mempool extends Observable {
     // @UP
     /**
      * @param {Hash} hash
-     * @returns {Transaction}
+     * @returns {DeliberationMessage}
      */
     getMessage(hash) {
         return this._messagesByHash.get(hash);
+    }
+
+    // @UP
+    /**
+     * @param {Hash} hash
+     * @returns {DeliberationInit}
+     */
+    getInitMessage(hash) {
+        return this._initMessageByHash.get(hash);
     }
 
     /**
@@ -19980,7 +20023,7 @@ class Mempool extends Observable {
      * @param {number} [maxSize]
      * @yields {IterableIterator.<Transaction>}
      */
-     *messageGenerator(maxSize = Infinity) {
+    *messageGenerator(maxSize = Infinity) {
         let size = 0;
         for (const [hash, msg] of this._messagesByHash.entryIterator()) {
 
@@ -20268,6 +20311,101 @@ Mempool.ReturnCode = {
 
 Class.register(Mempool);
 
+class DeliberationInit{
+    /**
+     * @param {String} problem
+     * @param {Array<Uint32>} rounds
+     * @param {Array<Uint32>} turns
+     * @param {Array.<String(PublicKey)>} participants
+     * Additional params not included
+     * @param {Uint32} timeStamp
+     * @param {Uint32} completionTimeStamp
+     * @param {Uint32} confidenceInConsensus
+    */
+    constructor(problem, rounds, turns, participants){
+        this._decodedProblem = problem;
+        this._rounds = rounds;
+        this._turns = turns;
+        this._participants = participants;
+    }
+
+    hash() {
+        // Exclude the signature, we don't want transactions to be malleable.
+        this._hash = this._hash || Hash.light(this.serialize());
+        return this._hash;
+    }
+
+    encodeMessage(){
+        let encoder = new TextEncoder();
+        this._encodedProblem = encoder.encode(this._decodedProblem);
+        this._lengthOfProblem = this._encodedProblem.length;
+
+        this._lengthOfParticipants = this._participants.length;        
+        let encodedParticipantsArray = this._participants.map(str => {
+            return encoder.encode(str);
+        });
+        this._totalLength = this._lengthOfParticipants * 64;
+        this._encodedParticipants = new Uint8Array(this._totalLength);
+        let offset = 0;
+        for (const arr of encodedParticipantsArray) {
+            this._encodedParticipants.set(arr, offset);
+            offset += arr.length;
+        }                
+    }
+
+    static unserialize(buf) {
+        let decoder = new TextDecoder();
+        const length = buf.readUint8();
+        const uint8Array = new Uint8Array(length);
+        for (let i = 0; i < length; i++) {
+            uint8Array[i] = buf.readUint8();
+        }
+        const rounds = buf.readUint32();
+        const turns = buf.readUint32();
+        const length2 = buf.readUint8();
+        const uint8Array2 = new Uint8Array(length2);
+        for (let i = 0; i < length2; i++) {
+            uint8Array2[i] = buf.readUint8();
+        }
+        const result = [];
+        for (let i = 0; i < length2; i += 64) {
+            result.push(uint8Array2.slice(i, i + 64));
+        }
+        let participants = [];
+        for(const arr of result){
+            participants.push(decoder.decode(arr));
+        }
+        let decodedProblem = decoder.decode(uint8Array);
+        return new DeliberationInit(decodedProblem, rounds, turns, participants);
+    }
+
+    serialize(buf) {
+        buf = buf || new SerialBuffer(this.serializedSize);
+        buf.writeUint8(this._lengthOfProblem);
+        for (let i = 0; i < this._lengthOfProblem; i++) {
+            buf.writeUint8(this._encodedProblem[i]);
+        }
+        buf.writeUint32(this._rounds);
+        buf.writeUint32(this._turns);
+        buf.writeUint8(this._totalLength);
+        for (let i = 0; i < this._totalLength; i++) {
+            buf.writeUint8(this._encodedParticipants[i]);
+        }
+        return buf;
+    }
+
+    /** @type {number} */
+    get serializedSize() {
+        return 1 
+            + 1 * this._lengthOfProblem
+            + 4 /*rounds*/
+            + 4 /*turns*/
+            + 1
+            + 1 * this._totalLength /* size of array = length * space for each 8 bit (1) */
+    }
+}
+Class.register(DeliberationInit);
+
 // @UP: Notes for adding new messages
 // Deliberation Message will be converted to Delimessage
 // Then the class DeliMessage needs to be included in the following places as well.
@@ -20354,7 +20492,7 @@ class InvRequestManager {
      * @param {BaseConsensusAgent} agent
      * @param {InvVector} vector
      */
-    askToRequestVector(agent, vector) {
+    askToRequestVector(agent, vector) {    
         if (agent.syncing || this._vectorsToRequest.length > InvRequestManager.MAX_INV_MANAGED) {
             agent.requestVector(vector);
             return;
@@ -20539,7 +20677,7 @@ class BaseConsensusAgent extends Observable {
         this._onToDisconnect(peer.channel, 'tx', msg => this._onTx(msg));
         this._onToDisconnect(peer.channel, 'msg', msg => this._onMsg(msg));
         this._onToDisconnect(peer.channel, 'init-deli', msg => this._onInitDeli(msg));
-        this._onToDisconnect(peer.channel, 'before-init', msg => this._beforeInit(msg));
+        
         this._onToDisconnect(peer.channel, 'not-found', msg => this._onNotFound(msg));
 
         this._onToDisconnect(peer.channel, 'subscribe', msg => this._onSubscribe(msg));
@@ -20551,7 +20689,6 @@ class BaseConsensusAgent extends Observable {
         this._onToDisconnect(peer.channel, 'transaction-receipts', msg => this._onTransactionReceipts(msg));
 
         this._onToDisconnect(peer.channel, 'mempool', msg => this._onMempool(msg));
-        // this._onToDisconnect(peer.channel, 'mempool', msg => this.sendMessage(msg));
 
         this._onToDisconnect(peer.channel, 'get-head', msg => this._onGetHead(msg));
         this._onToDisconnect(peer.channel, 'head', msg => this._onHead(msg));
@@ -20715,34 +20852,30 @@ class BaseConsensusAgent extends Observable {
     }
 
     relayMessage(message) {
-        // @UP: If cannot registerUtterance then do not relay message
-        const result = this._deliberation.registerUtterance(message);
-        if(result){
-            // @UP: Dont know what this means but; Only relay message if it matches the peer's subscription.
-            
-            const vector = InvVector.fromMessage(message);
-
-            // Don't relay message to this peer if it already knows it.
-            if (this._knownObjects.contains(vector)) {
-                Log.v(BaseConsensusAgent, `Not sending ${message.hash()} to ${this.peer.peerAddress}: already knows`);
-                return false;
-            }
-
-            // Relay transaction to peer later.
-            const serializedSize = message.serializedSize;
-            // @UP we can send it as a freeInvVector later
-            this._waitingInvVectors.enqueue(vector);
-
-            // Assume that the peer knows this message after short time.
-            this._timers.setTimeout(`knows-tx-${vector.hash.toBase64()}`, () => {
-                this._knownObjects.add(vector);
-            }, BaseConsensusAgent.KNOWS_OBJECT_AFTER_INV_DELAY);
-
-            Log.v(BaseConsensusAgent, `Sending ${message.hash()} to ${this.peer.peerAddress}`);
-
-            return true;
+        // console.log("relay message");
+        // @UP: Dont know what this means but; Only relay message if it matches the peer's subscription.
+        
+        const vector = InvVector.fromMessage(message);
+        
+        // Don't relay message to this peer if it already knows it.
+        if (this._knownObjects.contains(vector)) {
+            Log.v(BaseConsensusAgent, `Not sending ${message.hash()} to ${this.peer.peerAddress}: already knows`);
+            return false;
         }
-        return false;
+
+        // Relay transaction to peer later.
+        const serializedSize = message.serializedSize;
+        // @UP we can send it as a freeInvVector later
+        this._waitingInvVectors.enqueue(vector);
+
+        // Assume that the peer knows this message after short time.
+        this._timers.setTimeout(`knows-tx-${vector.hash.toBase64()}`, () => {
+            this._knownObjects.add(vector);
+        }, BaseConsensusAgent.KNOWS_OBJECT_AFTER_INV_DELAY);
+
+        Log.v(BaseConsensusAgent, `Sending ${message.hash()} to ${this.peer.peerAddress}`);
+
+        return true;
     }
 
 
@@ -20964,8 +21097,7 @@ class BaseConsensusAgent extends Observable {
             // Filter out objects that we are not interested in.
             if (!this._shouldRequestData(vector)) {
                 continue;
-            }
-
+            }                  
             switch (vector.type) {
                 case InvVector.Type.BLOCK: {
                     const block = await this._getBlock(vector.hash, /*includeForks*/ true); // eslint-disable-line no-await-in-loop
@@ -20989,7 +21121,16 @@ class BaseConsensusAgent extends Observable {
                 }
                 case InvVector.Type.MESSAGE: {
                     const message = this._getMessage(vector.hash);
-                    // console.log("hash inside case",vector.hash, message);
+                    if (!message) {
+                        unknownMsgs.push(vector);
+                        this._onNewMessageAnnounced(vector.hash);
+                    } else {
+                        this._onKnownMessageAnnounced(vector.hash, message);
+                    }
+                    break;
+                }
+                case InvVector.Type.INITMESSAGE: {
+                    const message = this._getInitMessage(vector.hash);                    
                     if (!message) {
                         unknownMsgs.push(vector);
                         this._onNewMessageAnnounced(vector.hash);
@@ -21029,7 +21170,7 @@ class BaseConsensusAgent extends Observable {
         // Store unknown vectors in objectsToRequest.
         this._blocksToRequest.enqueueAll(vector.filter(v => v.type === InvVector.Type.BLOCK));
         this._txsToRequest.enqueueAll(vector.filter(v => v.type === InvVector.Type.TRANSACTION));
-        this._msgsToRequest.enqueueAll(vector.filter(v => v.type === InvVector.Type.MESSAGE));
+        this._msgsToRequest.enqueueAll(vector.filter(v => v.type === InvVector.Type.MESSAGE || v.type === InvVector.Type.INITMESSAGE));
 
         // Clear the request throttle timeout.
         this._timers.clearTimeout('inv');
@@ -21096,6 +21237,17 @@ class BaseConsensusAgent extends Observable {
      * @abstract
      */
     _getMessage(hash) {
+        // MUST be implemented by subclasses.
+        throw new Error('not implemented');
+    }
+
+    /**
+     * @param {Hash} hash
+     * @returns {?DeliberationInit}
+     * @protected
+     * @abstract
+     */
+    _getInitMessage(hash) {
         // MUST be implemented by subclasses.
         throw new Error('not implemented');
     }
@@ -21395,7 +21547,7 @@ class BaseConsensusAgent extends Observable {
         const vector = new InvVector(InvVector.Type.MESSAGE, hash);
         if (!this._objectsInFlight.contains(vector) && !this._objectsThatFlew.contains(vector)) {
             Log.w(BaseConsensusAgent, `Unsolicited message ${hash} received from ${this._peer.peerAddress}, discarding`);
-            console.log("Inside");
+            console.log("Received message not requested, Discarding it");
             return;
         }
         
@@ -21439,15 +21591,54 @@ class BaseConsensusAgent extends Observable {
     }
 
     async _onInitDeli(msg){
-        if (this._deliberation.problem === undefined || this._deliberation.isEnd){
-            this._deliberation = new Deliberation(msg._decodedMessage, msg._rounds, msg._turns, msg._participants, false)
+        msg.message.encodeMessage();
+        const hash = msg.message.hash();
+        
+        // Check if we have requested this transaction.
+        const vector = new InvVector(InvVector.Type.INITMESSAGE, hash);
+        if (!this._objectsInFlight.contains(vector) && !this._objectsThatFlew.contains(vector)) {
+            Log.w(BaseConsensusAgent, `Unsolicited message ${hash} received from ${this._peer.peerAddress}, discarding`);
+            console.log("Received message not requested, Discarding it");
+            return;
         }
-    }
+        
+        this._invRequestManager.noteVectorReceived(InvVector.fromMessage(msg.message));
 
-    async _beforeInit(msg){
-        if (this._deliberation.problem === undefined || this._deliberation.isEnd){
-            this._deliberation = new Deliberation(msg._decodedMessage, msg._rounds, msg._turns, msg._participants, false)
-        }
+        // Mark object as received.
+        this._onObjectReceived(vector);
+
+        // Mark message as processing.
+        this._objectsProcessing.add(vector);
+
+        // @UP: TODO: Skipped this just as i have skippe this in relayMessage
+        // @UP: Instead we directly process the message because that is what we need to do anyway
+        //Process message if we subscribed for this transaction.
+        // if (this._localSubscription.matchesTransaction(msg.transaction)) {
+        //     await this._processTransaction(hash, msg.transaction);
+        // }
+
+        await this._processMessage(hash, msg.message);
+
+        const msgRequest = this._pendingRequests.get(vector);
+        if (msgRequest) {
+            this._pendingRequests.remove(vector);
+            this._timers.clearTimeout(`tx-request-${vector.hash.toBase64()}`);
+            for (const {resolve} of msgRequest) {
+                try {
+                    resolve(msg.message);
+                } catch (e) {
+                    // Ignore
+                }
+            }
+        } 
+
+        // @UP: TODO: COmmenenting anything to do with subscription
+        // else if (!this._localSubscription.matchesTransaction(msg.transaction) && this._lastSubscriptionChange + BaseConsensusAgent.SUBSCRIPTION_CHANGE_GRACE_PERIOD > Date.now()) {
+        //     this._peer.channel.close(CloseType.TRANSACTION_NOT_MATCHING_SUBSCRIPTION, 'received transaction not matching our subscription');
+        // }
+
+        // Mark object as processed.
+        this._onObjectProcessed(vector);
     }
 
     /**
@@ -21598,7 +21789,7 @@ class BaseConsensusAgent extends Observable {
         // Send back all known objects.
         // Send notFound for unknown objects.
         const unknownObjects = [];
-        for (const vector of msg.vectors) {
+        for (const vector of msg.vectors) {            
             switch (vector.type) {
                 case InvVector.Type.BLOCK: {
                     const block = await this._getRawBlock(vector.hash, /*includeForks*/ false); // eslint-disable-line no-await-in-loop
@@ -21625,6 +21816,20 @@ class BaseConsensusAgent extends Observable {
                 }
                 case InvVector.Type.MESSAGE: {
                     const msg = this._getMessage(vector.hash);
+                    if (msg) {
+                        // We have found a requested message, send it back to the sender.
+                        this._peer.channel.msg(msg);
+                        //@UP TODO: The message-relayed event should be handled appropriately in the future
+                        this.fire('message-relayed', msg);
+                    } else {
+                        // console.log("else");
+                        // Requested transaction is unknown.
+                        unknownObjects.push(vector);
+                    }
+                    break;
+                }
+                case InvVector.Type.INITMESSAGE: {
+                    const msg = this._getInitMessage(vector.hash);
                     if (msg) {
                         // We have found a requested message, send it back to the sender.
                         this._peer.channel.msg(msg);
@@ -22943,15 +23148,6 @@ class BaseConsensus extends Observable {
         }
     }
 
-    sendInitMessage(msg){
-        // Don't relay message if we are not synced yet.
-        if (!this._established) return;
-
-        for (const agent of this._agents.valueIterator()) {
-            agent._peer.channel._send(msg)
-        }
-    }
-    
     /**
      * @param {Transaction} tx
      * @protected
@@ -24677,6 +24873,16 @@ class FullConsensusAgent extends BaseConsensusAgent {
 
     /**
      * @param {Hash} hash
+     * @returns {?DeliberationInit}
+     * @protected
+     * @override
+     */
+    _getInitMessage(hash) {
+        return this._mempool.getInitMessage(hash);
+    }
+
+    /**
+     * @param {Hash} hash
      * @param {Block} block
      * @returns {void}
      * @protected
@@ -25286,6 +25492,12 @@ class FullConsensus extends BaseConsensus {
         const mempoolCode = await this._mempool.pushMessage(msg);
         //TODO: handle the mempool code switch case
     }
+
+    async generateAndSendMessage(){
+        const mempoolCode = await this._mempool.generateAndSendMessage();
+        //TODO: handle the mempool code switch case
+    }
+    
 
     /**
      * @returns {Array.<Transaction>}
@@ -28831,7 +29043,7 @@ class DeliMessage extends Message{
      */
     constructor(message) {
         super(Message.Type.MSG);
-        /** @type {TransacDeliberationMessagetion} */
+        /** @type {DeliberationMessage} */
         this._message = message;
     }
 
@@ -28874,105 +29086,163 @@ class DeliMessage extends Message{
     }
 }
 Class.register(DeliMessage)
+
+// class InitMessage extends Message{
+//     /**
+//      * @param {String} problem
+//      * @param {Array<Uint32>} rounds
+//      * @param {Array<Uint32>} turns
+//      * @param {Array.<String(PublicKey)>} participants
+//      * Additional params not included
+//      * @param {Uint32} timeStamp
+//      * @param {Uint32} completionTimeStamp
+//      * @param {Uint32} confidenceInConsensus
+//     */
+//     constructor(problem, rounds, turns, participants){
+//         super(Message.Type.INITMSG);
+//         this._decodedProblem = problem;
+//         this._rounds = rounds;
+//         this._turns = turns;
+//         this._participants = participants;
+//     }
+
+//     hash() {
+//         // Exclude the signature, we don't want transactions to be malleable.
+//         this._hash = this._hash || Hash.light(this.serialize());
+//         return this._hash;
+//     }
+
+//     encodeMessage(){
+//         let encoder = new TextEncoder();
+//         this._encodedProblem = encoder.encode(this._decodedProblem);
+//         this._lengthOfProblem = this._encodedProblem.length;
+
+//         this._lengthOfParticipants = this._participants.length;        
+//         let encodedParticipantsArray = this._participants.map(str => {
+//             return encoder.encode(str);
+//         });
+//         this._totalLength = this._lengthOfParticipants * 64;
+//         this._encodedParticipants = new Uint8Array(this._totalLength);
+//         let offset = 0;
+//         for (const arr of encodedParticipantsArray) {
+//             this._encodedParticipants.set(arr, offset);
+//             offset += arr.length;
+//         }                
+//     }
+
+//     // hash() {
+//     //     // Exclude the signature, we don't want transactions to be malleable.
+//     //     this._hash = this._hash || Hash.light(this.serialize());
+//     //     return this._hash;
+//     // }
+
+//     static unserialize(buf) {
+//         Message.unserialize(buf);
+//         let decoder = new TextDecoder();
+//         const length = buf.readUint8();
+//         const uint8Array = new Uint8Array(length);
+//         for (let i = 0; i < length; i++) {
+//             uint8Array[i] = buf.readUint8();
+//         }
+//         const rounds = buf.readUint32();
+//         const turns = buf.readUint32();
+//         const length2 = buf.readUint8();
+//         const uint8Array2 = new Uint8Array(length2);
+//         for (let i = 0; i < length2; i++) {
+//             uint8Array2[i] = buf.readUint8();
+//         }
+//         const result = [];
+//         for (let i = 0; i < length2; i += 64) {
+//             result.push(uint8Array2.slice(i, i + 64));
+//         }
+//         let participants = [];
+//         for(const arr of result){
+//             participants.push(decoder.decode(arr));
+//         }
+//         let decodedProblem = decoder.decode(uint8Array);
+//         return new InitMessage(decodedProblem, rounds, turns, participants);
+//     }
+
+//     serialize(buf) {
+//         buf = buf || new SerialBuffer(this.serializedSize);
+//         super.serialize(buf);
+//         buf.writeUint8(this._lengthOfProblem);
+//         for (let i = 0; i < this._lengthOfProblem; i++) {
+//             buf.writeUint8(this._encodedProblem[i]);
+//         }
+//         buf.writeUint32(this._rounds);
+//         buf.writeUint32(this._turns);
+//         buf.writeUint8(this._totalLength);
+//         for (let i = 0; i < this._totalLength; i++) {
+//             buf.writeUint8(this._encodedParticipants[i]);
+//         }
+//         super._setChecksum(buf);
+//         return buf;
+//     }
+
+//     /** @type {number} */
+//     get serializedSize() {
+//         return super.serializedSize 
+//             + 1
+//             + 1 * this._lengthOfProblem
+//             + 4 /*rounds*/
+//             + 4 /*turns*/
+//             + 1
+//             + 1 * this._totalLength /* size of array = length * space for each 8 bit (1) */
+//     }
+// }
+// Class.register(InitMessage);
+
 class InitMessage extends Message{
     /**
-     * @param {String} problem
-     * @param {Array<Uint32>} rounds
-     * @param {Array<Uint32>} turns
-     * @param {Array.<String(PublicKey)>} participants
-     * Additional params not included
-     * @param {Uint32} timeStamp
-     * @param {Uint32} completionTimeStamp
-     * @param {Uint32} confidenceInConsensus
-    */
-    constructor(problem, rounds, turns, participants){
+     * @param {DeliberationInit} message
+     */
+    constructor(message) {
         super(Message.Type.INITMSG);
-        this._decodedProblem = problem;
-        this._rounds = rounds;
-        this._turns = turns;
-        this._participants = participants;
+        /** @type {DeliberationInit} */
+        this._message = message;
     }
 
-    encodeMessage(){
-        let encoder = new TextEncoder();
-        this._encodedProblem = encoder.encode(this._decodedProblem);
-        this._lengthOfProblem = this._encodedProblem.length;
-
-        this._lengthOfParticipants = this._participants.length;        
-        let encodedParticipantsArray = this._participants.map(str => {
-            return encoder.encode(str);
-        });
-        this._totalLength = this._lengthOfParticipants * 64;
-        this._encodedParticipants = new Uint8Array(this._totalLength);
-        let offset = 0;
-        for (const arr of encodedParticipantsArray) {
-            this._encodedParticipants.set(arr, offset);
-            offset += arr.length;
-        }                
-    }
-
-    // hash() {
-    //     // Exclude the signature, we don't want transactions to be malleable.
-    //     this._hash = this._hash || Hash.light(this.serialize());
-    //     return this._hash;
-    // }
-
+    /**
+     * @param {SerialBuffer} buf
+     * @returns {InitMessage}
+     */
     static unserialize(buf) {
         Message.unserialize(buf);
-        let decoder = new TextDecoder();
-        const length = buf.readUint8();
-        const uint8Array = new Uint8Array(length);
-        for (let i = 0; i < length; i++) {
-            uint8Array[i] = buf.readUint8();
-        }
-        const rounds = buf.readUint32();
-        const turns = buf.readUint32();
-        const length2 = buf.readUint8();
-        const uint8Array2 = new Uint8Array(length2);
-        for (let i = 0; i < length2; i++) {
-            uint8Array2[i] = buf.readUint8();
-        }
-        const result = [];
-        for (let i = 0; i < length2; i += 64) {
-            result.push(uint8Array2.slice(i, i + 64));
-        }
-        let participants = [];
-        for(const arr of result){
-            participants.push(decoder.decode(arr));
-        }
-        let decodedProblem = decoder.decode(uint8Array);
-        return new InitMessage(decodedProblem, rounds, turns, participants);
+        const message = DeliberationInit.unserialize(buf);
+        return new InitMessage(message);
     }
 
+    /**
+     * @param {SerialBuffer} [buf]
+     * @returns {SerialBuffer}
+     */
     serialize(buf) {
         buf = buf || new SerialBuffer(this.serializedSize);
         super.serialize(buf);
-        buf.writeUint8(this._lengthOfProblem);
-        for (let i = 0; i < this._lengthOfProblem; i++) {
-            buf.writeUint8(this._encodedProblem[i]);
-        }
-        buf.writeUint32(this._rounds);
-        buf.writeUint32(this._turns);
-        buf.writeUint8(this._totalLength);
-        for (let i = 0; i < this._totalLength; i++) {
-            buf.writeUint8(this._encodedParticipants[i]);
-        }
+        this._message.serialize(buf);
         super._setChecksum(buf);
         return buf;
     }
 
-     /** @type {number} */
-     get serializedSize() {
-        return super.serializedSize 
-            + 1
-            + 1 * this._lengthOfProblem
-            + 4 /*rounds*/
-            + 4 /*turns*/
-            + 1
-            + 1 * this._totalLength /* size of array = length * space for each 8 bit (1) */
+    /** @type {number} */
+    get serializedSize() {
+        let size = super.serializedSize
+            + this._message.serializedSize;
+        return size;
+    }
+
+    /** @type {DeliberationInit} */
+    get message() {
+        return this._message;
+    }
+
+    toString() {
+        return `DeliberationInit{hash=${this._message.hash()}}`;
     }
 }
 Class.register(InitMessage);
+
 class AddrMessage extends Message {
     /**
      * @param {Array.<PeerAddress>} addresses
@@ -29380,8 +29650,11 @@ class InvVector {
     }
 
     static fromMessage(message) {
-        const hash = message.hash();        
-        return new InvVector(InvVector.Type.MESSAGE, hash);
+        const hash = message.hash();  
+        if(message instanceof DeliberationMessage)      
+            return new InvVector(InvVector.Type.MESSAGE, hash);
+        else
+            return new InvVector(InvVector.Type.INITMESSAGE, hash);
     }
 
     /**
@@ -29482,6 +29755,7 @@ InvVector.Type = {
     TRANSACTION: 1,
     BLOCK: 2,
     MESSAGE: 3,
+    INITMESSAGE: 4,
 
     /**
      * @param {SerialBuffer} buf
@@ -36159,9 +36433,6 @@ class PeerChannel extends Observable {
      * @private
      */
     _send(msg) {
-        if(msg._type == 13){
-            this.fire('before-init', msg);
-        }
         return this._conn.send(msg.serialize());
     }
 
@@ -36260,11 +36531,14 @@ class PeerChannel extends Observable {
     }
 
     /**
-     * @param {DeliberationMessage} message
+     * @param {DeliberationMessage || DeliberationInit} message
      * @return {boolean}
     */
     msg(message) {
-        return this._send(new DeliMessage(message));
+        if(message instanceof DeliberationMessage)
+            return this._send(new DeliMessage(message));
+        else
+            return this._send(new InitMessage(message));
     }
 
     /**
@@ -43330,12 +43604,15 @@ class Client {
         for (const address of peerAddresses){            
             arrayOfPeers.push(address._address._publicKey.toHex());  
         }        
-        console.log(arrayOfPeers);
-        let msg = new InitMessage(problem, rounds, turns, arrayOfPeers);        
+        let msg = new DeliberationInit(problem, rounds, turns, arrayOfPeers);        
         msg.encodeMessage()
         const consensus = await this._consensus;
-        let consensusResult = await consensus.sendInitMessage(msg);
+        let consensusResult = await consensus.sendMessage(msg);
         //TODO: @UP handle the switch cases as handled above in sendTransaction
+    }
+
+    async startDeliberation(){        
+        let result = await this._consensus.generateAndSendMessage();
     }
 
     /**

@@ -3305,14 +3305,14 @@ class BufferUtils {
         }
         const uint8View = BufferUtils._toUint8View(buffer);
         return BufferUtils._ISO_8859_15_DECODER.decode(uint8View)
-            .replace(/\u20ac/g, '\u00a4')  // € => ¤
-            .replace(/\u0160/g, '\u00a6')  // Š => ¦
-            .replace(/\u0161/g, '\u00a8')  // š => ¨
-            .replace(/\u017d/g, '\u00b4')  // Ž => ´
-            .replace(/\u017e/g, '\u00b8')  // ž => ¸
-            .replace(/\u0152/g, '\u00bc')  // Œ => ¼
-            .replace(/\u0153/g, '\u00bd')  // œ => ½
-            .replace(/\u0178/g, '\u00be'); // Ÿ => ¾
+            .replace(/\u20ac/g, '\u00a4')  // � => �
+            .replace(/\u0160/g, '\u00a6')  // ` => �
+            .replace(/\u0161/g, '\u00a8')  // a => �
+            .replace(/\u017d/g, '\u00b4')  // } => �
+            .replace(/\u017e/g, '\u00b8')  // ~ => �
+            .replace(/\u0152/g, '\u00bc')  // R => �
+            .replace(/\u0153/g, '\u00bd')  // S => �
+            .replace(/\u0178/g, '\u00be'); // x => �
     }
 
     static _tripletToBase64(num) {
@@ -6054,7 +6054,7 @@ Class.register(CRC32);
                         // Return NaN if either NaN, or both Infinity or 0.
                         !x.s || !y.s || (xc ? yc && xc[0] == yc[0] : !yc) ? NaN :
 
-                            // Return ±0 if x is ±0 or y is ±Infinity, or return ±Infinity as y is ±0.
+                            // Return �0 if x is �0 or y is �Infinity, or return �Infinity as y is �0.
                             xc && xc[0] == 0 || !yc ? s * 0 : s / 0
                     );
                 }
@@ -6377,7 +6377,7 @@ Class.register(CRC32);
                 var base,
                     s = isNum ? str : str.replace(whitespaceOrPlus, '');
 
-                // No exception on ±Infinity or NaN.
+                // No exception on �Infinity or NaN.
                 if (isInfinityOrNaN.test(s)) {
                     x.s = isNaN(s) ? null : s < 0 ? -1 : 1;
                     x.c = x.e = null;
@@ -6603,7 +6603,7 @@ Class.register(CRC32);
 
         /*
          * If dp is undefined or null or true or false, return the number of decimal places of the
-         * value of this BigNumber, or null if the value of this BigNumber is ±Infinity or NaN.
+         * value of this BigNumber, or null if the value of this BigNumber is �Infinity or NaN.
          *
          * Otherwise, if dp is a number, return a new BigNumber whose value is the value of this
          * BigNumber rounded to a maximum of dp decimal places using rounding mode rm, or
@@ -6692,7 +6692,7 @@ Class.register(CRC32);
 
             n = new BigNumber(n);
 
-            // Allow NaN and ±Infinity, but not other non-integers.
+            // Allow NaN and �Infinity, but not other non-integers.
             if (n.c && !n.isInteger()) {
                 throw Error
                 (bignumberError + 'Exponent not an integer: ' + n);
@@ -6703,11 +6703,11 @@ Class.register(CRC32);
             // Exponent of MAX_SAFE_INTEGER is 15.
             nIsBig = n.e > 14;
 
-            // If x is NaN, ±Infinity, ±0 or ±1, or n is ±Infinity, NaN or ±0.
+            // If x is NaN, �Infinity, �0 or �1, or n is �Infinity, NaN or �0.
             if (!x.c || !x.c[0] || x.c[0] == 1 && !x.e && x.c.length == 1 || !n.c || !n.c[0]) {
 
                 // The sign of the result of pow when x is negative depends on the evenness of n.
-                // If +n overflows to ±Infinity, the evenness of n would be not be known.
+                // If +n overflows to �Infinity, the evenness of n would be not be known.
                 y = new BigNumber(Math.pow(+x.valueOf(), nIsBig ? 2 - isOdd(n) : +n));
                 return m ? y.mod(m) : y;
             }
@@ -6723,8 +6723,8 @@ Class.register(CRC32);
 
                 if (isModExp) x = x.mod(m);
 
-                // Overflow to ±Infinity: >=2**1e10 or >=1.0000024**1e15.
-                // Underflow to ±0: <=0.79**1e10 or <=0.9999975**1e15.
+                // Overflow to �Infinity: >=2**1e10 or >=1.0000024**1e15.
+                // Underflow to �0: <=0.79**1e10 or <=0.9999975**1e15.
             } else if (n.e > 9 && (x.e > 0 || x.e < -1 || (x.e == 0
                 // [1, 240000000]
                 ? x.c[0] > 1 || nIsBig && x.c[1] >= 24e7
@@ -6734,10 +6734,10 @@ Class.register(CRC32);
                 // If x is negative and n is odd, k = -0, else k = 0.
                 k = x.s < 0 && isOdd(n) ? -0 : 0;
 
-                // If x >= 1, k = ±Infinity.
+                // If x >= 1, k = �Infinity.
                 if (x.e > -1) k = 1 / k;
 
-                // If n is negative return ±0, else return ±Infinity.
+                // If n is negative return �0, else return �Infinity.
                 return new BigNumber(nIsNeg ? 1 / k : k);
 
             } else if (POW_PRECISION) {
@@ -7129,7 +7129,7 @@ Class.register(CRC32);
                 xc = x.c,
                 yc = (y = new BigNumber(y, b)).c;
 
-            // Either NaN, ±Infinity or ±0?
+            // Either NaN, �Infinity or �0?
             if (!xc || !yc || !xc[0] || !yc[0]) {
 
                 // Return NaN if either is NaN, or one is 0 and the other is Infinity.
@@ -7138,11 +7138,11 @@ Class.register(CRC32);
                 } else {
                     y.s *= x.s;
 
-                    // Return ±Infinity if either is ±Infinity.
+                    // Return �Infinity if either is �Infinity.
                     if (!xc || !yc) {
                         y.c = y.e = null;
 
-                        // Return ±0 if either is ±0.
+                        // Return �0 if either is �0.
                     } else {
                         y.c = [0];
                         y.e = 0;
@@ -7248,7 +7248,7 @@ Class.register(CRC32);
 
             if (!xe || !ye) {
 
-                // Return ±Infinity if either ±Infinity.
+                // Return �Infinity if either �Infinity.
                 if (!xc || !yc) return new BigNumber(a / 0);
 
                 // Either zero?
@@ -7300,7 +7300,7 @@ Class.register(CRC32);
 
         /*
          * If sd is undefined or null or true or false, return the number of significant digits of
-         * the value of this BigNumber, or null if the value of this BigNumber is ±Infinity or NaN.
+         * the value of this BigNumber, or null if the value of this BigNumber is �Infinity or NaN.
          * If sd is true include integer-part trailing zeros in the count.
          *
          * Otherwise, if sd is a number, return a new BigNumber whose value is the value of this
@@ -19715,6 +19715,9 @@ class Mempool extends Observable {
         /** @type {Deliberation} */
         this._deliberation = new Deliberation();
 
+        //@UP: Session id for a deliberation
+        this._sessionId = "";
+
         // Listen for changes in the blockchain head to evict transactions that have become invalid.
         blockchain.on('head-changed', (block, rebranching) => {
             if (!rebranching) {
@@ -19737,18 +19740,30 @@ class Mempool extends Observable {
     }
 
     async generateAndSendMessage(){
-        console.log("before calling llm");
-        const response = await axios.post(`http://127.0.0.1:5000/round1`);
-        console.log("after callling llm", response);
+        const response = await axios.post(`http://127.0.0.1:5000/round1`, {
+            params: {
+                session_id: this._sessionId
+            }
+        });
+        const reply = response.data.result;
+        console.log("generated message", reply);
         
     }
 
     // @UP
-    pushMessage(message) { 
+    async pushMessage(message) { 
         if(message instanceof DeliberationInit){
             if (this._deliberation.problem === undefined || this._deliberation.isEnd){
-                console.log("Init new deliberation");                
-                this._deliberation = new Deliberation(message._decodedProblem, message._rounds, message._turns, message._participants, false)
+                this._deliberation = new Deliberation(message._decodedProblem, message._rounds, message._turns, message._participants, false);
+                const response = await axios.post(`http://127.0.0.1:5000/init`, {
+                    params: {
+                        problem: message._decodedProblem,
+                        rounds: message._rounds,
+                        turns: message._turns,
+                        agents: message._participants
+                    }
+                });           
+                this._sessionId = response.data.session_id;
                 this._synchronizer.push(() => this._pushMessage(message));
             }
             else{
@@ -36381,7 +36396,7 @@ class PeerChannel extends Observable {
 
             // From the Bitcoin Reference:
             //  "Be careful of reject message feedback loops where two peers
-            //   each don’t understand each other’s reject messages and so keep
+            //   each dont understand each others reject messages and so keep
             //   sending them back and forth forever."
 
             // If the message does not make sense at a whole or we fear to get into a reject loop,

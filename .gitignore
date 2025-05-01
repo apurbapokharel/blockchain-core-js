@@ -36,3 +36,5 @@ packaging/BUILD/package.json
 packaging/BUILD/node-ui/
 packaging/npm/*
 !packaging/npm/README.md
+package-lock.json
+yarn.lock

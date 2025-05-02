@@ -1764,39 +1764,42 @@ class Deliberation extends Observable{
             this._speakerIndex = 0;
         }
     }
-
+  
     get problem(){
         return this._problem;
     }
-
+    
     get totalRound(){
         return this._totalRound;
     }
-
+    
     get totalTurn(){
         return this._totalTurn;
     }
-
+    
     get participants(){
         return this._participants;
     }
-
+    
     get currentRound(){
         return this._currentRound;
     }
-
+    
     get currentTurn(){
         return this._currentTurn;
     }
-
+    
     get speakerIndex(){
         return this._speakerIndex;
     }
-
+    
     get isEnd(){
         return this._isEnd;
     }
     
+    get currentSpeaker(){
+        return this._participants[this._speakerIndex]
+    }
 } 
 Class.register(Deliberation);
 class EventLoopHelper {
@@ -19716,7 +19719,12 @@ class Mempool extends Observable {
         this._deliberation = new Deliberation();
 
         //@UP: Session id for a deliberation
+        /** @type {String} */
         this._sessionId = "";
+
+        //@UP: Round Converstaion
+        /** @type {HashMap.<(round,turn), DeliberationMessage>} */
+        this._messagesByRounds = new HashMap();
 
         // Listen for changes in the blockchain head to evict transactions that have become invalid.
         blockchain.on('head-changed', (block, rebranching) => {
@@ -19739,21 +19747,41 @@ class Mempool extends Observable {
         return this._synchronizer.push(() => this._pushTransaction(transaction));
     }
 
-    async generateAndSendMessage(){
-        const response = await axios.post(`http://127.0.0.1:5000/round1`, {
-            params: {
-                session_id: this._sessionId
-            }
-        });
-        const reply = response.data.result;
-        console.log("generated message", reply);
-        
+    //@UP: This method can be exposed to reentrancy/DDoS/Resource Exhaustion Attacks.
+    // If, we check address == currentSpeaker and generate new utterance but
+    // we never increase the speakerIndex (push message does this primarily)
+    // If that happens this function can be continously called to keep on generating new messages
+    // FIX: we increase the speaker index so that we prevent this viscious cycle
+    // FIX: we also push the message from this function so that pushMessage logic can be sperated for messaged that are relayed
+    async generateAndSendMessage(publicKeySender){
+        // check to see if address == currentSpeaker 
+        // if not do nothing
+        // else genereate message
+        // create a new delibertaionMessage from reply
+        // push message
+        const currentSpeakerAddress = this._deliberation.currentSpeaker;
+        const publicKeyHex = publicKeySender._address._publicKey.toHex();
+        if(currentSpeakerAddress === publicKeyHex){
+            this._deliberation.increaseSpeakerIndex();
+            const response = await axios.post(`http://127.0.0.1:5000/round1`, {
+                params: {
+                    session_id: this._sessionId
+                }
+            });
+            let reply = response.data.result.response;
+            reply = reply.replace(/\n/g, ' ').trim();
+            console.log(reply);
+            const message = new DeliberationMessage(reply, publicKeySender._address._publicKey, Math.floor(Date.now()/1000));     
+            message.encodeMessage();
+            this._synchronizer.push(() => this._pushMessage(message));
+        }
     }
 
     // @UP
     async pushMessage(message) { 
         if(message instanceof DeliberationInit){
             if (this._deliberation.problem === undefined || this._deliberation.isEnd){
+                console.log("Init deli called");
                 this._deliberation = new Deliberation(message._decodedProblem, message._rounds, message._turns, message._participants, false);
                 const response = await axios.post(`http://127.0.0.1:5000/init`, {
                     params: {
@@ -19764,7 +19792,7 @@ class Mempool extends Observable {
                     }
                 });           
                 this._sessionId = response.data.session_id;
-                this._synchronizer.push(() => this._pushMessage(message));
+                this._synchronizer.push(() => this._pushMessage(message));                
             }
             else{
                 console.log("No need to init new deliberation");
@@ -21553,7 +21581,7 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     async _onMsg(msg) {
-        // console.log("on msg called", msg);
+        console.log("on msg called", msg);
 
         msg.message.encodeMessage();
         const hash = msg.message.hash();
@@ -25508,8 +25536,8 @@ class FullConsensus extends BaseConsensus {
         //TODO: handle the mempool code switch case
     }
 
-    async generateAndSendMessage(){
-        const mempoolCode = await this._mempool.generateAndSendMessage();
+    async generateAndSendMessage(publicKeySender){
+        const mempoolCode = await this._mempool.generateAndSendMessage(publicKeySender);
         //TODO: handle the mempool code switch case
     }
     
@@ -43611,11 +43639,10 @@ class Client {
         const problem = deliParams.problem;
         const rounds = deliParams.rounds;
         const turns = deliParams.turns;
-
         let address = (await this._network.getOwnAddress())._address._publicKey.toHex();            
         let peerAddresses = await this._network.getAddresses();  
         let arrayOfPeers = [];
-        arrayOfPeers.push(address);
+        arrayOfPeers.push(address);        
         for (const address of peerAddresses){            
             arrayOfPeers.push(address._address._publicKey.toHex());  
         }        
@@ -43626,8 +43653,9 @@ class Client {
         //TODO: @UP handle the switch cases as handled above in sendTransaction
     }
 
-    async startDeliberation(){        
-        let result = await this._consensus.generateAndSendMessage();
+    async startDeliberation(){
+        const publicKeySender = await this._network.getOwnAddress();        
+        let result = await this._consensus.generateAndSendMessage(publicKeySender);
     }
 
     /**

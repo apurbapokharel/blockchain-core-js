@@ -447,8 +447,7 @@ async function action(args, rl) {
             return;
         }
         case 'start.deliberation': {
-            const senderAddress = await jsonRpcFetch('nodeAddress');
-            console.log(await jsonRpcFetch('startDeliberation', senderAddress));
+            console.log(await jsonRpcFetch('startDeliberation'));
             return;
         }
         case 'send.message': {

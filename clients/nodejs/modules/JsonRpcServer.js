@@ -647,8 +647,8 @@ class JsonRpcServer {
         return true;
     }
     
-    async startDeliberation(address) {
-        // console.log(json);
+    async startDeliberation() {
+        //console.log(address);
         await this._client.startDeliberation();
         return true;
     }

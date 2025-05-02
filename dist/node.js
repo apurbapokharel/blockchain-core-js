@@ -1702,7 +1702,7 @@ class Deliberation extends Observable{
      * @param {DeliberationMessage} msg 
      */
     registerUtterance(msg){
-        this.printDeliberationState();
+        // this.printDeliberationState();
         const sender = msg.senderPubKey.toHex();
         // console.log(sender, this.participants[this.speakerIndex], sender !== this.participants[this.speakerIndex]);
         
@@ -19679,6 +19679,7 @@ MempoolFilter.CONTRACT_VALUE = 0;
 Class.register(MempoolFilter);
 
 const axios = require('axios');
+const { Status } = require('tslint/lib/runner');
 
 class Mempool extends Observable {
     /**
@@ -19722,8 +19723,9 @@ class Mempool extends Observable {
         /** @type {String} */
         this._sessionId = "";
 
-        //@UP: Round Converstaion
-        /** @type {HashMap.<(round,turn), DeliberationMessage>} */
+        //@UP:  
+        // The value should have been DeliberationMessage but making its a string for storage purposes
+        /** @type {HashMap.<(round,turn), String>} */
         this._messagesByRounds = new HashMap();
 
         // Listen for changes in the blockchain head to evict transactions that have become invalid.
@@ -19747,6 +19749,45 @@ class Mempool extends Observable {
         return this._synchronizer.push(() => this._pushTransaction(transaction));
     }
 
+
+    //@UP: Adding replies to mapping so that they can be used during the reflection round
+    addReplyToMapping(reply, currentRound, currentTurn, currentSpeaker){
+        //the reply for the given round should not exist
+        //arrays are used by reference so using string which are refered by value
+        const tuple = [currentRound, currentTurn, currentSpeaker];
+        const key = tuple.join(',');
+        const status = this._messagesByRounds.contains(key);
+        if(status){
+            console.log("ERROR, THIS SHOULD NEVER BE THE CASE");            
+        }
+        else{
+            this._messagesByRounds.put(key, reply);
+        }
+    }
+
+    getPrevReply(currentRound, currentTurn, currentSpeaker){
+        let neighIndex = currentSpeaker - 1;
+        let prevRound = 0;
+        let prevTurn = 0;
+        if(neighIndex == -1){
+            neighIndex = this._deliberation.participants - 1; 
+        }
+        if(currentTurn == 2){
+            prevTurn = currentTurn - 1;
+            prevRound = currentRound;
+        }
+        else{
+            prevTurn = currentTurn;
+            prevRound = currentRound - 1;    
+        }
+        key1 = [prevRound, prevTurn, currentSpeaker];
+        key2 = [prevRound, prevTurn, neighIndex];
+        key1 = key1.join(',');
+        key2 = key2.join(',');
+        return [this._messagesByRounds.get(key1), this._messagesByRounds.get(key2)];
+
+    }
+
     //@UP: This method can be exposed to reentrancy/DDoS/Resource Exhaustion Attacks.
     // If, we check address == currentSpeaker and generate new utterance but
     // we never increase the speakerIndex (push message does this primarily)
@@ -19754,22 +19795,41 @@ class Mempool extends Observable {
     // FIX: we increase the speaker index so that we prevent this viscious cycle
     // FIX: we also push the message from this function so that pushMessage logic can be sperated for messaged that are relayed
     async generateAndSendMessage(publicKeySender){
-        // check to see if address == currentSpeaker 
-        // if not do nothing
-        // else genereate message
+        // check to see if address == currentSpeaker then genereate message
+        // see the current round info to know which method to call with which parameters
         // create a new delibertaionMessage from reply
         // push message
         const currentSpeakerAddress = this._deliberation.currentSpeaker;
         const publicKeyHex = publicKeySender._address._publicKey.toHex();
         if(currentSpeakerAddress === publicKeyHex){
+            const currentRound = this._deliberation.currentRound;
+            const currentTurn = this._deliberation.currentTurn; 
+            const currentSpeaker = this._deliberation.currentSpeaker; 
             this._deliberation.increaseSpeakerIndex();
-            const response = await axios.post(`http://127.0.0.1:5000/round1`, {
-                params: {
-                    session_id: this._sessionId
-                }
-            });
+            let response = "";
+            // Can add independent logic for each round of deliberation and call seperate methods acordingly
+            if(currentRound==1){
+                response = await axios.post(`http://127.0.0.1:5000/round1`, {
+                    params: {
+                        session_id: this._sessionId
+                    }
+                });
+            }
+            else{
+                const replies = getPrevReply(currentRound, currentTurn, currentSpeaker);
+                const userReply = replies[0];
+                const neighbourReply = replies[1];
+                response = await axios.post(`http://127.0.0.1:5000/round2`, {
+                    params: {
+                        session_id: this._sessionId,
+                        userReply: userReply,
+                        neighbourReply: neighbourReply
+                    }
+                });
+            }
             let reply = response.data.result.response;
             reply = reply.replace(/\n/g, ' ').trim();
+            addReplyToMapping(reply, currentRound, currentTurn, currentSpeaker);
             console.log(reply);
             const message = new DeliberationMessage(reply, publicKeySender._address._publicKey, Math.floor(Date.now()/1000));     
             message.encodeMessage();
@@ -19778,7 +19838,7 @@ class Mempool extends Observable {
     }
 
     // @UP
-    async pushMessage(message) { 
+    async pushMessage(message, ownAddress) { 
         if(message instanceof DeliberationInit){
             if (this._deliberation.problem === undefined || this._deliberation.isEnd){
                 console.log("Init deli called");
@@ -19800,12 +19860,24 @@ class Mempool extends Observable {
         }
         if(message instanceof DeliberationMessage){
             //1. check if the message can be accepted
-                //a. Check if sender is the current speakerIndex
-                // const status = this._deliberation.checkUtterance(message)
-            //2. If the message can be accepted relay the message 
-            //3. Once the message is relayed check if its this peers turn to speak
+                //a. Register utterance will check and return false 
+                    // if deliberation is alread end or speaking turn violated
+                //b. Register uttreance will also increase the turns and rounds appropriately
+            const currentRound = this._deliberation.currentRound;
+            const currentTurn = this._deliberation.currentTurn; 
+            const currentSpeaker = this._deliberation.currentSpeaker; 
+            const status = this._deliberation.registerUtterance(message)
+            if(status){
+                addReplyToMapping(message.decodedMessage, currentRound, currentTurn, currentSpeaker);
+                //2. If the message can be accepted relay the message 
+                this._synchronizer.push(() => this._pushMessage(message));
+            }
+            //3. Now check if its this peers turn to speak
+            const currentSpeakerAddress = this._deliberation.currentSpeaker;
+            if(currentSpeakerAddress === ownAddress){
                 //a. If then generateMsg and pushMessage again
-            return this._synchronizer.push(() => this._pushMessage(message));
+                this.generateAndSendMessage(ownAddress);
+            }
         }
     }
 
@@ -24707,8 +24779,9 @@ class FullConsensusAgent extends BaseConsensusAgent {
      * @param {Peer} peer
      * @param {InvRequestManager} invRequestManager
      * @param {Subscription} targetSubscription
+     * @param {String} ownAddress
      */
-    constructor(blockchain, mempool, time, peer, invRequestManager, targetSubscription) {
+    constructor(blockchain, mempool, time, peer, invRequestManager, targetSubscription, ownAddress) {
         super(time, peer, invRequestManager, targetSubscription);
         /** @type {FullChain} */
         this._blockchain = blockchain;
@@ -24736,6 +24809,10 @@ class FullConsensusAgent extends BaseConsensusAgent {
         // The block hash that we want to learn to consider the sync complete.
         /** @type {Hash} */
         this._syncTarget = peer.headHash;
+
+        //@UP
+        /** @type {String} */
+        this._ownAddress = ownAddress;
 
         /** @type {RateLimit} */
         this._chainProofLimit = new RateLimit(FullConsensusAgent.CHAIN_PROOF_RATE_LIMIT);
@@ -25084,7 +25161,7 @@ class FullConsensusAgent extends BaseConsensusAgent {
      * @protected
      */
     async _processMessage(hash, message) {
-        const result = await this._mempool.pushMessage(message);
+        const result = await this._mempool.pushMessage(message, this._ownAddress);
         //@UP: process the Mempool returned code
     }
 
@@ -25358,8 +25435,9 @@ class FullConsensus extends BaseConsensus {
      * @param {FullChain} blockchain
      * @param {Mempool} mempool
      * @param {Network} network
+     * //@UP @param {String} ownAddress
      */
-    constructor(blockchain, mempool, network) {
+    constructor(blockchain, mempool, network, ownAddress) {
         super(blockchain, mempool, network);
         /** @type {FullChain} */
         this._blockchain = blockchain;
@@ -25367,6 +25445,8 @@ class FullConsensus extends BaseConsensus {
         this._mempool = mempool;
         /** @type {BlockProducer} */
         this._producer = new BlockProducer(blockchain, blockchain.accounts, mempool, network.time);
+        /** @type {String} */
+        this._ownAddress = ownAddress;
     }
 
     //
@@ -25532,7 +25612,7 @@ class FullConsensus extends BaseConsensus {
 
     // @UP
     async sendMessage(msg){
-        const mempoolCode = await this._mempool.pushMessage(msg);
+        const mempoolCode = await this._mempool.pushMessage(msg, this._ownAddress);
         //TODO: handle the mempool code switch case
     }
 
@@ -25581,7 +25661,7 @@ class FullConsensus extends BaseConsensus {
      * @override
      */
     _newConsensusAgent(peer) {
-        return new FullConsensusAgent(this._blockchain, this._mempool, this._network.time, peer, this._invRequestManager, this._subscription);
+        return new FullConsensusAgent(this._blockchain, this._mempool, this._network.time, peer, this._invRequestManager, this._subscription, this._ownAddress);
     }
 
     /** @type {FullChain} */
@@ -28711,7 +28791,13 @@ class Consensus {
         /** @type {Network} */
         const network = new Network(blockchain, netconfig, time);
 
-        return new FullConsensus(blockchain, mempool, network);
+        //@UP: Adding a new param that lets me send the address of the own node to class FullConsensus which gets passed on to FullConsensusAgent
+        // I need FullConsensusAgent to be able to have the address of itself so that it can know when it is their turn to generate and send new messages
+        // For this I am adding this paramater
+        // FIXME: TODO: Does there needs to be some form of checking to ensure that wrong or incorrect address is not sent during initialization? I think so but how?
+        /** @type {String} */        
+        const selfAddress = netconfig.peerAddress.publicKey.toHex();
+        return new FullConsensus(blockchain, mempool, network, selfAddress);
     }
 
     /**

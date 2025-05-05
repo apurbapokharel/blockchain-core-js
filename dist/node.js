@@ -19825,8 +19825,8 @@ class Mempool extends Observable {
                 response = await axios.post(`http://127.0.0.1:5000/round2`, {
                     params: {
                         session_id: this._sessionId,
-                        userReply: userReply,
-                        neighbourReply: neighbourReply
+                        user_reply: userReply,
+                        neighbour_reply: neighbourReply
                     }
                 });
             }

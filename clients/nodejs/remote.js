@@ -450,6 +450,9 @@ async function action(args, rl) {
             console.log(await jsonRpcFetch('startDeliberation'));
             return;
         }
+        case 'see.mapping':{
+            console.log(await jsonRpcFetch('seeMapping'));
+        }
         case 'send.message': {
             const senderAddress = await jsonRpcFetch('nodeAddress');
             if(args.length == 2){

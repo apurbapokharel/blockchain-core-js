@@ -19725,7 +19725,7 @@ class Mempool extends Observable {
 
         //@UP:  
         // The value should have been DeliberationMessage but making its a string for storage purposes
-        /** @type {HashMap.<(round,turn), String>} */
+        /** @type {HashMap.<(round,turn, speakerIndex), String>} */
         this._messagesByRounds = new HashMap();
 
         // Listen for changes in the blockchain head to evict transactions that have become invalid.
@@ -19766,11 +19766,13 @@ class Mempool extends Observable {
     }
 
     getPrevReply(currentRound, currentTurn, currentSpeakerIndex){
+        // console.log("oarams",currentRound, currentTurn, currentSpeakerIndex);
+        
         let neighIndex = currentSpeakerIndex - 1;
         let prevRound = 0;
         let prevTurn = 0;
         if(neighIndex == -1){
-            neighIndex = this._deliberation.participants - 1; 
+                neighIndex = this._deliberation.participants.length - 1; 
         }
         if(currentTurn == 2){
             prevTurn = currentTurn - 1;
@@ -19780,16 +19782,30 @@ class Mempool extends Observable {
             prevTurn = currentTurn;
             prevRound = currentRound - 1;    
         }
-        key1 = [prevRound, prevTurn, currentSpeakerIndex];
-        key2 = [prevRound, prevTurn, neighIndex];
+        let key1 = [prevRound, prevTurn, currentSpeakerIndex];
+        let key2 = [prevRound, prevTurn, neighIndex];
         key1 = key1.join(',');
         key2 = key2.join(',');
+        // console.log(key1, key2);
         return [this._messagesByRounds.get(key1), this._messagesByRounds.get(key2)];
-
     }
 
+    //@UP: for testing only
+    async seeMapping(){
+        
+        for (const [key, value] of this._messagesByRounds.entryIterator()) {
+            console.log(key, value);
+        }
+
+        // console.log(this._messagesByRounds.get("key"));
+        // let key1 = [1, 2, 3];
+        // key1 = key1.join(',');
+        // this._messagesByRounds.put(key1, "I am in favor of AI regulation. AI regulation should be global. The government should establish an AI agency. The AI agency should set standards for AI development. AI developers should be licensed.")        
+        // console.log(this._messagesByRounds.get(key1));        
+        // this._messagesByRounds.remove(key1);
+    }
     /**
-     * @param {BasicAddress} transaction
+     * @param {PublicKey} publicKeySender
     */    
     //@UP: This method can be exposed to reentrancy/DDoS/Resource Exhaustion Attacks.
     // If, we check address == currentSpeaker and generate new utterance but
@@ -19797,13 +19813,13 @@ class Mempool extends Observable {
     // If that happens this function can be continously called to keep on generating new messages
     // FIX: we increase the speaker index so that we prevent this viscious cycle
     // FIX: we also push the message from this function so that function pushMessage's logic can be sperated for messaged that are relayed
-    async generateAndSendMessage(basicAddressSender){
+    async generateAndSendMessage(publicKeySender){
         // check to see if address == currentSpeaker then genereate message
         // see the current round info to know which method to call with which parameters
         // create a new delibertaionMessage from reply
         // push message
         const currentSpeakerAddress = this._deliberation.currentSpeaker;
-        const publicKeyHex = basicAddressSender._address._publicKey.toHex();
+        const publicKeyHex = publicKeySender.toHex();
         if(currentSpeakerAddress === publicKeyHex){
             const currentRound = this._deliberation.currentRound;
             const currentTurn = this._deliberation.currentTurn; 
@@ -19819,28 +19835,36 @@ class Mempool extends Observable {
                 });
             }
             else{
-                const replies = getPrevReply(currentRound, currentTurn, currentSpeakerIndex);
-                const userReply = replies[0];
-                const neighbourReply = replies[1];
-                response = await axios.post(`http://127.0.0.1:5000/round2`, {
-                    params: {
-                        session_id: this._sessionId,
-                        user_reply: userReply,
-                        neighbour_reply: neighbourReply
-                    }
-                });
+                const replies = this.getPrevReply(currentRound, currentTurn, currentSpeakerIndex);
+                const user_reply = replies[0];
+                const neighbour_reply = replies[1];
+                // console.log("Replies", user_reply, neighbour_reply);
+                //FIXME: Model sometime generates empty reponse so will loop till non empty response generated
+                while(true){
+                    response = await axios.post(`http://127.0.0.1:5000/round2`, {
+                        params: {
+                            session_id: this._sessionId,
+                            user_reply: user_reply,
+                            neighbour_reply: neighbour_reply
+                        }
+                    });
+                    if(response.data.result.response.length != 0)
+                        break;    
+                }
             }
             let reply = response.data.result.response;
             reply = reply.replace(/\n/g, ' ').trim();
-            addReplyToMapping(reply, currentRound, currentTurn, currentSpeakerIndex);
+            this.addReplyToMapping(reply, currentRound, currentTurn, currentSpeakerIndex);
             console.log("generated reply is", reply);
-            const message = new DeliberationMessage(reply, basicAddressSender._address._publicKey, Math.floor(Date.now()/1000));     
+            const message = new DeliberationMessage(reply, publicKeySender, Math.floor(Date.now()/1000));     
             message.encodeMessage();
+            // console.log(message.hash());
             this._synchronizer.push(() => this._pushMessage(message));
         }
         else{
             console.log("Not current peers turn to speak");
         }
+        this._deliberation.printDeliberationState();
     }
 
     // @UP
@@ -19848,7 +19872,7 @@ class Mempool extends Observable {
      * @param {DeliberationMessage} message
      * OR
      * @param {DeliberationInit} message
-     * @param {String<PublicKey>} ownAddress
+     * @param {PublicKey} ownAddress
     */  
     async pushMessage(message, ownAddress) { 
         if(message instanceof DeliberationInit){
@@ -19871,6 +19895,7 @@ class Mempool extends Observable {
             }
         }
         if(message instanceof DeliberationMessage){
+            console.log("reply", message._decodedMessage);
             //1. check if the message can be accepted
                 //a. Register utterance will check and return false 
                     // if deliberation is alread end or speaking turn violated
@@ -19880,13 +19905,13 @@ class Mempool extends Observable {
             const currentSpeakerIndex = this._deliberation.speakerIndex;
             const status = this._deliberation.registerUtterance(message)
             if(status){
-                addReplyToMapping(message.decodedMessage, currentRound, currentTurn, currentSpeakerIndex);
+                this.addReplyToMapping(message.decodedMessage, currentRound, currentTurn, currentSpeakerIndex);
                 //2. If the message can be accepted relay the message 
                 this._synchronizer.push(() => this._pushMessage(message));
             }
             //3. Now check if its this peers turn to speak
             const currentSpeakerAddress = this._deliberation.currentSpeaker;
-            if(currentSpeakerAddress === ownAddress){
+            if(currentSpeakerAddress === ownAddress.toHex() && ! this._deliberation.isEnd){
                 //a. If then generateMsg and pushMessage again
                 this.generateAndSendMessage(ownAddress);
             }
@@ -20565,7 +20590,7 @@ class DeliberationMessage {
     static unserialize(buf) {
         const senderPubKey = PublicKey.unserialize(buf);
         const timeStamp = buf.readUint32();
-        const length = buf.readUint8();
+        const length = buf.readUint32();
         const uint8Array = new Uint8Array(length);
         for (let i = 0; i < length; i++) {
             uint8Array[i] = buf.readUint8();
@@ -20579,7 +20604,7 @@ class DeliberationMessage {
         buf = buf || new SerialBuffer(this.serializedSize);
         this._senderPubKey.serialize(buf);
         buf.writeUint32(this._timestamp);
-        buf.writeUint8(this._length);
+        buf.writeUint32(this._length);
         for (let i = 0; i < this._length; i++) {
             buf.writeUint8(this._encodedMessage[i]);
         }
@@ -20589,7 +20614,7 @@ class DeliberationMessage {
     /** @type {number} */
     get serializedSize() {
         return this._senderPubKey.serializedSize  
-            + /*length*/ 1
+            + /*length*/ 4
             + /*timestamp*/ 4
             + 1 * this._length /* size of array = length * space for each 8 bit (1) */
     }
@@ -21665,7 +21690,7 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     async _onMsg(msg) {
-        console.log("on msg called", msg);
+        // console.log("on msg called", msg);
 
         msg.message.encodeMessage();
         const hash = msg.message.hash();
@@ -24791,7 +24816,7 @@ class FullConsensusAgent extends BaseConsensusAgent {
      * @param {Peer} peer
      * @param {InvRequestManager} invRequestManager
      * @param {Subscription} targetSubscription
-     * @param {String<PublicKey>} ownAddress
+     * @param {PublicKey} ownAddress
      */
     constructor(blockchain, mempool, time, peer, invRequestManager, targetSubscription, ownAddress) {
         super(time, peer, invRequestManager, targetSubscription);
@@ -24823,7 +24848,7 @@ class FullConsensusAgent extends BaseConsensusAgent {
         this._syncTarget = peer.headHash;
 
         //@UP
-        /** @type {String<PublicKey>} */
+        /** @type {PublicKey} */
         this._ownAddress = ownAddress;
 
         /** @type {RateLimit} */
@@ -25447,7 +25472,7 @@ class FullConsensus extends BaseConsensus {
      * @param {FullChain} blockchain
      * @param {Mempool} mempool
      * @param {Network} network
-     * //@UP @param {String} ownAddress
+     * //@UP @param {PublicKey} ownAddress
      */
     constructor(blockchain, mempool, network, ownAddress) {
         super(blockchain, mempool, network);
@@ -25457,7 +25482,7 @@ class FullConsensus extends BaseConsensus {
         this._mempool = mempool;
         /** @type {BlockProducer} */
         this._producer = new BlockProducer(blockchain, blockchain.accounts, mempool, network.time);
-        /** @type {String<PublicKey>} */
+        /** @type {PublicKey} */
         this._ownAddress = ownAddress;
     }
 
@@ -25641,10 +25666,14 @@ class FullConsensus extends BaseConsensus {
      * @returns {Promise.<>}
      */
     async generateAndSendMessage(basicAddressSender){
-        const mempoolCode = await this._mempool.generateAndSendMessage(basicAddressSender);
+        const publicKeySender = basicAddressSender._address._publicKey;
+        const mempoolCode = await this._mempool.generateAndSendMessage(publicKeySender);
         //TODO: handle the mempool code switch case
     }
     
+    async seeMapping(){
+        await this._mempool.seeMapping();
+    }
 
     /**
      * @returns {Array.<Transaction>}
@@ -28819,8 +28848,8 @@ class Consensus {
         // I need FullConsensusAgent to be able to have the address of itself so that it can know when it is their turn to generate and send new messages
         // For this I am adding this paramater
         // FIXME: TODO: Does there needs to be some form of checking to ensure that wrong or incorrect address is not sent during initialization? I think so but how?
-        /** @type {String<PublicKey>} */        
-        const selfAddress = netconfig.peerAddress.publicKey.toHex();
+        /** @type {PublicKey} */        
+        const selfAddress = netconfig.peerAddress.publicKey;
         return new FullConsensus(blockchain, mempool, network, selfAddress);
     }
 
@@ -43767,6 +43796,10 @@ class Client {
         //type of publicKeySender is BasicAddress
         const basicAddressSender = await this._network.getOwnAddress();         
         let result = await this._consensus.generateAndSendMessage(basicAddressSender);
+    }
+
+    async seeMapping(){
+        await this._consensus.seeMapping();
     }
 
     /**

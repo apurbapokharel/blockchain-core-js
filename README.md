@@ -1,3 +1,6 @@
+# This branch has the basic send message feature and no integration with LLM.
+# Deli1 has the LLM integration. 
+
 # For details about the original repo please refer to NIMIQ.md file in this repo.
 ## Please note that as of Jan 25, 2025 core-js has been archived and nimiq moved to a rust based PoS implementation my work on core-js started from September 2023.
 

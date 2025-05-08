@@ -684,15 +684,6 @@ class BaseConsensus extends Observable {
             agent.relayMessage(msg);
         }
     }
-
-    sendInitMessage(msg){
-        // Don't relay message if we are not synced yet.
-        if (!this._established) return;
-
-        for (const agent of this._agents.valueIterator()) {
-            agent._peer.channel._send(msg)
-        }
-    }
     
     /**
      * @param {Transaction} tx

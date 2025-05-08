@@ -5,7 +5,7 @@ class Deliberation extends Observable{
      * @param {Array<Uint32>} turns
      * @param {Array.<String(PublicKey)>} participants
     */
-    constructor(problem, rounds, turns, participants){
+    constructor(problem, rounds, turns, participants, isEnded = true){
         super();
         this._problem = problem;
         this._totalRound = rounds;
@@ -14,7 +14,7 @@ class Deliberation extends Observable{
         this._currentRound = 1;
         this._currentTurn = 1;
         this._speakerIndex = 0;
-        this._isEnd = false;
+        this._isEnd = isEnded;
     }
 
     // generateUtterance(){
@@ -30,25 +30,26 @@ class Deliberation extends Observable{
      * @param {DeliberationMessage} msg 
      */
     registerUtterance(msg){
-        // check if the sender is the currentSpeaker
-        this.printDeliberationState();
+        // this.printDeliberationState();
         const sender = msg.senderPubKey.toHex();
-        console.log(sender, this.participants[this.speakerIndex], sender !== this.participants[this.speakerIndex]);
+        // console.log(sender, this.participants[this.speakerIndex], sender !== this.participants[this.speakerIndex]);
         
-        if (sender !== this.participants[this.speakerIndex]){
-            this._error('Message/Utterance speaking order violated');
-            return;
-        }
         // check if the deliberation is not already terminated
         if(this.isEnd || this.currentRound > this.totalRound){
             this._error('Deliberation already terminated');
-            return;
+            return false;
+        }
+        // check if the sender is the currentSpeaker
+        if (sender !== this.participants[this.speakerIndex]){
+            this._error('Message/Utterance speaking order violated');
+            return false;
         }
         // check if the time has not exceeded
         // other checks
 
         this.increaseSpeakerIndex();
         this.printDeliberationState();
+        return true;
     }
 
     // Only for testing
@@ -122,6 +123,10 @@ class Deliberation extends Observable{
 
     get isEnd(){
         return this._isEnd;
+    }
+    
+    get currentSpeaker(){
+        return this._participants[this._speakerIndex]
     }
     
 } 

@@ -84,9 +84,6 @@ class PeerChannel extends Observable {
      * @private
      */
     _send(msg) {
-        if(msg._type == 13){
-            this.fire('before-init', msg);
-        }
         return this._conn.send(msg.serialize());
     }
 

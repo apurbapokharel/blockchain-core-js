@@ -1150,7 +1150,6 @@ class WebSocketFactory {
 Class.register(WebSocketFactory);
 
 const URL = require('url');
-const { log } = require('console');
 
 class HttpRequest {
     /**
@@ -1764,35 +1763,35 @@ class Deliberation extends Observable{
             this._speakerIndex = 0;
         }
     }
-  
+
     get problem(){
         return this._problem;
     }
-    
+
     get totalRound(){
         return this._totalRound;
     }
-    
+
     get totalTurn(){
         return this._totalTurn;
     }
-    
+
     get participants(){
         return this._participants;
     }
-    
+
     get currentRound(){
         return this._currentRound;
     }
-    
+
     get currentTurn(){
         return this._currentTurn;
     }
-    
+
     get speakerIndex(){
         return this._speakerIndex;
     }
-    
+
     get isEnd(){
         return this._isEnd;
     }
@@ -1800,6 +1799,7 @@ class Deliberation extends Observable{
     get currentSpeaker(){
         return this._participants[this._speakerIndex]
     }
+    
 } 
 Class.register(Deliberation);
 class EventLoopHelper {
@@ -3308,14 +3308,14 @@ class BufferUtils {
         }
         const uint8View = BufferUtils._toUint8View(buffer);
         return BufferUtils._ISO_8859_15_DECODER.decode(uint8View)
-            .replace(/\u20ac/g, '\u00a4')  // � => �
-            .replace(/\u0160/g, '\u00a6')  // ` => �
-            .replace(/\u0161/g, '\u00a8')  // a => �
-            .replace(/\u017d/g, '\u00b4')  // } => �
-            .replace(/\u017e/g, '\u00b8')  // ~ => �
-            .replace(/\u0152/g, '\u00bc')  // R => �
-            .replace(/\u0153/g, '\u00bd')  // S => �
-            .replace(/\u0178/g, '\u00be'); // x => �
+            .replace(/\u20ac/g, '\u00a4')  // € => ¤
+            .replace(/\u0160/g, '\u00a6')  // Š => ¦
+            .replace(/\u0161/g, '\u00a8')  // š => ¨
+            .replace(/\u017d/g, '\u00b4')  // Ž => ´
+            .replace(/\u017e/g, '\u00b8')  // ž => ¸
+            .replace(/\u0152/g, '\u00bc')  // Œ => ¼
+            .replace(/\u0153/g, '\u00bd')  // œ => ½
+            .replace(/\u0178/g, '\u00be'); // Ÿ => ¾
     }
 
     static _tripletToBase64(num) {
@@ -6057,7 +6057,7 @@ Class.register(CRC32);
                         // Return NaN if either NaN, or both Infinity or 0.
                         !x.s || !y.s || (xc ? yc && xc[0] == yc[0] : !yc) ? NaN :
 
-                            // Return �0 if x is �0 or y is �Infinity, or return �Infinity as y is �0.
+                            // Return ±0 if x is ±0 or y is ±Infinity, or return ±Infinity as y is ±0.
                             xc && xc[0] == 0 || !yc ? s * 0 : s / 0
                     );
                 }
@@ -6380,7 +6380,7 @@ Class.register(CRC32);
                 var base,
                     s = isNum ? str : str.replace(whitespaceOrPlus, '');
 
-                // No exception on �Infinity or NaN.
+                // No exception on ±Infinity or NaN.
                 if (isInfinityOrNaN.test(s)) {
                     x.s = isNaN(s) ? null : s < 0 ? -1 : 1;
                     x.c = x.e = null;
@@ -6606,7 +6606,7 @@ Class.register(CRC32);
 
         /*
          * If dp is undefined or null or true or false, return the number of decimal places of the
-         * value of this BigNumber, or null if the value of this BigNumber is �Infinity or NaN.
+         * value of this BigNumber, or null if the value of this BigNumber is ±Infinity or NaN.
          *
          * Otherwise, if dp is a number, return a new BigNumber whose value is the value of this
          * BigNumber rounded to a maximum of dp decimal places using rounding mode rm, or
@@ -6695,7 +6695,7 @@ Class.register(CRC32);
 
             n = new BigNumber(n);
 
-            // Allow NaN and �Infinity, but not other non-integers.
+            // Allow NaN and ±Infinity, but not other non-integers.
             if (n.c && !n.isInteger()) {
                 throw Error
                 (bignumberError + 'Exponent not an integer: ' + n);
@@ -6706,11 +6706,11 @@ Class.register(CRC32);
             // Exponent of MAX_SAFE_INTEGER is 15.
             nIsBig = n.e > 14;
 
-            // If x is NaN, �Infinity, �0 or �1, or n is �Infinity, NaN or �0.
+            // If x is NaN, ±Infinity, ±0 or ±1, or n is ±Infinity, NaN or ±0.
             if (!x.c || !x.c[0] || x.c[0] == 1 && !x.e && x.c.length == 1 || !n.c || !n.c[0]) {
 
                 // The sign of the result of pow when x is negative depends on the evenness of n.
-                // If +n overflows to �Infinity, the evenness of n would be not be known.
+                // If +n overflows to ±Infinity, the evenness of n would be not be known.
                 y = new BigNumber(Math.pow(+x.valueOf(), nIsBig ? 2 - isOdd(n) : +n));
                 return m ? y.mod(m) : y;
             }
@@ -6726,8 +6726,8 @@ Class.register(CRC32);
 
                 if (isModExp) x = x.mod(m);
 
-                // Overflow to �Infinity: >=2**1e10 or >=1.0000024**1e15.
-                // Underflow to �0: <=0.79**1e10 or <=0.9999975**1e15.
+                // Overflow to ±Infinity: >=2**1e10 or >=1.0000024**1e15.
+                // Underflow to ±0: <=0.79**1e10 or <=0.9999975**1e15.
             } else if (n.e > 9 && (x.e > 0 || x.e < -1 || (x.e == 0
                 // [1, 240000000]
                 ? x.c[0] > 1 || nIsBig && x.c[1] >= 24e7
@@ -6737,10 +6737,10 @@ Class.register(CRC32);
                 // If x is negative and n is odd, k = -0, else k = 0.
                 k = x.s < 0 && isOdd(n) ? -0 : 0;
 
-                // If x >= 1, k = �Infinity.
+                // If x >= 1, k = ±Infinity.
                 if (x.e > -1) k = 1 / k;
 
-                // If n is negative return �0, else return �Infinity.
+                // If n is negative return ±0, else return ±Infinity.
                 return new BigNumber(nIsNeg ? 1 / k : k);
 
             } else if (POW_PRECISION) {
@@ -7132,7 +7132,7 @@ Class.register(CRC32);
                 xc = x.c,
                 yc = (y = new BigNumber(y, b)).c;
 
-            // Either NaN, �Infinity or �0?
+            // Either NaN, ±Infinity or ±0?
             if (!xc || !yc || !xc[0] || !yc[0]) {
 
                 // Return NaN if either is NaN, or one is 0 and the other is Infinity.
@@ -7141,11 +7141,11 @@ Class.register(CRC32);
                 } else {
                     y.s *= x.s;
 
-                    // Return �Infinity if either is �Infinity.
+                    // Return ±Infinity if either is ±Infinity.
                     if (!xc || !yc) {
                         y.c = y.e = null;
 
-                        // Return �0 if either is �0.
+                        // Return ±0 if either is ±0.
                     } else {
                         y.c = [0];
                         y.e = 0;
@@ -7251,7 +7251,7 @@ Class.register(CRC32);
 
             if (!xe || !ye) {
 
-                // Return �Infinity if either �Infinity.
+                // Return ±Infinity if either ±Infinity.
                 if (!xc || !yc) return new BigNumber(a / 0);
 
                 // Either zero?
@@ -7303,7 +7303,7 @@ Class.register(CRC32);
 
         /*
          * If sd is undefined or null or true or false, return the number of significant digits of
-         * the value of this BigNumber, or null if the value of this BigNumber is �Infinity or NaN.
+         * the value of this BigNumber, or null if the value of this BigNumber is ±Infinity or NaN.
          * If sd is true include integer-part trailing zeros in the count.
          *
          * Otherwise, if sd is a number, return a new BigNumber whose value is the value of this
@@ -17539,10 +17539,10 @@ class Block {
             // Hash.fromAny(plain.interlinkHash),
             Hash.fromAny(plain.bodyHash),
             Hash.fromAny(plain.accountsHash),
-            plain.nBits,
+            //plain.nBits,
             plain.height,
             plain.timestamp,
-            plain.nonce,
+            //plain.nonce,
             plain.version
         );
         // const interlink = new BlockInterlink((plain.interlink.hashes || plain.interlink).map(h => Hash.fromAny(h)), Hash.fromAny(plain.prevHash));
@@ -19679,7 +19679,6 @@ MempoolFilter.CONTRACT_VALUE = 0;
 Class.register(MempoolFilter);
 
 const axios = require('axios');
-const { Status } = require('tslint/lib/runner');
 
 class Mempool extends Observable {
     /**
@@ -20463,6 +20462,80 @@ Mempool.ReturnCode = {
 
 Class.register(Mempool);
 
+// @UP: Notes for adding new messages
+// Deliberation Message will be converted to Delimessage
+// Then the class DeliMessage needs to be included in the following places as well.
+// 1. Class MessageFactory.classes, 2. Class PeerChannel.event, 3. Class Message.Type
+class DeliberationMessage {
+  
+    /**
+     * @param {String} message
+     * @param {PublicKey} senderPubKey
+     * @param {Uint32} timeStamp
+     */
+    constructor(message, senderPubKey, timeStamp){
+        this._decodedMessage = message
+        this._senderPubKey = senderPubKey;
+        this._timestamp = timeStamp;
+    }
+
+    encodeMessage(){
+        let encoder = new TextEncoder();
+        this._encodedMessage = encoder.encode(this._decodedMessage);
+        this._length = this._encodedMessage.length;
+    }
+
+    hash() {
+        // Exclude the signature, we don't want transactions to be malleable.
+        this._hash = this._hash || Hash.light(this.serialize());
+        return this._hash;
+    }
+
+    static unserialize(buf) {
+        const senderPubKey = PublicKey.unserialize(buf);
+        const timeStamp = buf.readUint32();
+        const length = buf.readUint32();
+        const uint8Array = new Uint8Array(length);
+        for (let i = 0; i < length; i++) {
+            uint8Array[i] = buf.readUint8();
+        }
+        let decoder = new TextDecoder();
+        let decodedMessage = decoder.decode(uint8Array);
+        return new DeliberationMessage(decodedMessage, senderPubKey, timeStamp);
+    }
+
+    serialize(buf) {
+        buf = buf || new SerialBuffer(this.serializedSize);
+        this._senderPubKey.serialize(buf);
+        buf.writeUint32(this._timestamp);
+        buf.writeUint32(this._length);
+        for (let i = 0; i < this._length; i++) {
+            buf.writeUint8(this._encodedMessage[i]);
+        }
+        return buf;
+    }
+
+    /** @type {number} */
+    get serializedSize() {
+        return this._senderPubKey.serializedSize  
+            + /*length*/ 4
+            + /*timestamp*/ 4
+            + 1 * this._length /* size of array = length * space for each 8 bit (1) */
+    }
+
+    get decodedMessage(){
+        return this._decodedMessage;
+    }
+
+    get senderPubKey(){
+        return this._senderPubKey;
+    }
+
+    get timestamp(){
+        return this._timestamp;
+    }
+}
+Class.register(DeliberationMessage);
 class DeliberationInit{
     /**
      * @param {String} problem
@@ -20557,81 +20630,6 @@ class DeliberationInit{
     }
 }
 Class.register(DeliberationInit);
-
-// @UP: Notes for adding new messages
-// Deliberation Message will be converted to Delimessage
-// Then the class DeliMessage needs to be included in the following places as well.
-// 1. Class MessageFactory.classes, 2. Class PeerChannel.event, 3. Class Message.Type
-class DeliberationMessage {
-  
-    /**
-     * @param {String} message
-     * @param {PublicKey} senderPubKey
-     * @param {Uint32} timeStamp
-     */
-    constructor(message, senderPubKey, timeStamp){
-        this._decodedMessage = message
-        this._senderPubKey = senderPubKey;
-        this._timestamp = timeStamp;
-    }
-
-    encodeMessage(){
-        let encoder = new TextEncoder();
-        this._encodedMessage = encoder.encode(this._decodedMessage);
-        this._length = this._encodedMessage.length;
-    }
-
-    hash() {
-        // Exclude the signature, we don't want transactions to be malleable.
-        this._hash = this._hash || Hash.light(this.serialize());
-        return this._hash;
-    }
-
-    static unserialize(buf) {
-        const senderPubKey = PublicKey.unserialize(buf);
-        const timeStamp = buf.readUint32();
-        const length = buf.readUint32();
-        const uint8Array = new Uint8Array(length);
-        for (let i = 0; i < length; i++) {
-            uint8Array[i] = buf.readUint8();
-        }
-        let decoder = new TextDecoder();
-        let decodedMessage = decoder.decode(uint8Array);
-        return new DeliberationMessage(decodedMessage, senderPubKey, timeStamp);
-    }
-
-    serialize(buf) {
-        buf = buf || new SerialBuffer(this.serializedSize);
-        this._senderPubKey.serialize(buf);
-        buf.writeUint32(this._timestamp);
-        buf.writeUint32(this._length);
-        for (let i = 0; i < this._length; i++) {
-            buf.writeUint8(this._encodedMessage[i]);
-        }
-        return buf;
-    }
-
-    /** @type {number} */
-    get serializedSize() {
-        return this._senderPubKey.serializedSize  
-            + /*length*/ 4
-            + /*timestamp*/ 4
-            + 1 * this._length /* size of array = length * space for each 8 bit (1) */
-    }
-
-    get decodedMessage(){
-        return this._decodedMessage;
-    }
-
-    get senderPubKey(){
-        return this._senderPubKey;
-    }
-
-    get timestamp(){
-        return this._timestamp;
-    }
-}
-Class.register(DeliberationMessage);
 class InvRequestManager {
     constructor() {
         /** @type {HashMap.<InvVector, {current: BaseConsensusAgent, waiting: Set.<BaseConsensusAgent>}>} */
@@ -20644,7 +20642,7 @@ class InvRequestManager {
      * @param {BaseConsensusAgent} agent
      * @param {InvVector} vector
      */
-    askToRequestVector(agent, vector) {    
+    askToRequestVector(agent, vector) {
         if (agent.syncing || this._vectorsToRequest.length > InvRequestManager.MAX_INV_MANAGED) {
             agent.requestVector(vector);
             return;
@@ -23300,6 +23298,15 @@ class BaseConsensus extends Observable {
         }
     }
 
+    sendInitMessage(msg){
+        // Don't relay message if we are not synced yet.
+        if (!this._established) return;
+
+        for (const agent of this._agents.valueIterator()) {
+            agent._peer.channel._send(msg)
+        }
+    }
+    
     /**
      * @param {Transaction} tx
      * @protected
@@ -28851,6 +28858,7 @@ class Consensus {
         /** @type {PublicKey} */        
         const selfAddress = netconfig.peerAddress.publicKey;
         return new FullConsensus(blockchain, mempool, network, selfAddress);
+
     }
 
     /**
@@ -29268,113 +29276,6 @@ class DeliMessage extends Message{
     }
 }
 Class.register(DeliMessage)
-
-// class InitMessage extends Message{
-//     /**
-//      * @param {String} problem
-//      * @param {Array<Uint32>} rounds
-//      * @param {Array<Uint32>} turns
-//      * @param {Array.<String(PublicKey)>} participants
-//      * Additional params not included
-//      * @param {Uint32} timeStamp
-//      * @param {Uint32} completionTimeStamp
-//      * @param {Uint32} confidenceInConsensus
-//     */
-//     constructor(problem, rounds, turns, participants){
-//         super(Message.Type.INITMSG);
-//         this._decodedProblem = problem;
-//         this._rounds = rounds;
-//         this._turns = turns;
-//         this._participants = participants;
-//     }
-
-//     hash() {
-//         // Exclude the signature, we don't want transactions to be malleable.
-//         this._hash = this._hash || Hash.light(this.serialize());
-//         return this._hash;
-//     }
-
-//     encodeMessage(){
-//         let encoder = new TextEncoder();
-//         this._encodedProblem = encoder.encode(this._decodedProblem);
-//         this._lengthOfProblem = this._encodedProblem.length;
-
-//         this._lengthOfParticipants = this._participants.length;        
-//         let encodedParticipantsArray = this._participants.map(str => {
-//             return encoder.encode(str);
-//         });
-//         this._totalLength = this._lengthOfParticipants * 64;
-//         this._encodedParticipants = new Uint8Array(this._totalLength);
-//         let offset = 0;
-//         for (const arr of encodedParticipantsArray) {
-//             this._encodedParticipants.set(arr, offset);
-//             offset += arr.length;
-//         }                
-//     }
-
-//     // hash() {
-//     //     // Exclude the signature, we don't want transactions to be malleable.
-//     //     this._hash = this._hash || Hash.light(this.serialize());
-//     //     return this._hash;
-//     // }
-
-//     static unserialize(buf) {
-//         Message.unserialize(buf);
-//         let decoder = new TextDecoder();
-//         const length = buf.readUint8();
-//         const uint8Array = new Uint8Array(length);
-//         for (let i = 0; i < length; i++) {
-//             uint8Array[i] = buf.readUint8();
-//         }
-//         const rounds = buf.readUint32();
-//         const turns = buf.readUint32();
-//         const length2 = buf.readUint8();
-//         const uint8Array2 = new Uint8Array(length2);
-//         for (let i = 0; i < length2; i++) {
-//             uint8Array2[i] = buf.readUint8();
-//         }
-//         const result = [];
-//         for (let i = 0; i < length2; i += 64) {
-//             result.push(uint8Array2.slice(i, i + 64));
-//         }
-//         let participants = [];
-//         for(const arr of result){
-//             participants.push(decoder.decode(arr));
-//         }
-//         let decodedProblem = decoder.decode(uint8Array);
-//         return new InitMessage(decodedProblem, rounds, turns, participants);
-//     }
-
-//     serialize(buf) {
-//         buf = buf || new SerialBuffer(this.serializedSize);
-//         super.serialize(buf);
-//         buf.writeUint8(this._lengthOfProblem);
-//         for (let i = 0; i < this._lengthOfProblem; i++) {
-//             buf.writeUint8(this._encodedProblem[i]);
-//         }
-//         buf.writeUint32(this._rounds);
-//         buf.writeUint32(this._turns);
-//         buf.writeUint8(this._totalLength);
-//         for (let i = 0; i < this._totalLength; i++) {
-//             buf.writeUint8(this._encodedParticipants[i]);
-//         }
-//         super._setChecksum(buf);
-//         return buf;
-//     }
-
-//     /** @type {number} */
-//     get serializedSize() {
-//         return super.serializedSize 
-//             + 1
-//             + 1 * this._lengthOfProblem
-//             + 4 /*rounds*/
-//             + 4 /*turns*/
-//             + 1
-//             + 1 * this._totalLength /* size of array = length * space for each 8 bit (1) */
-//     }
-// }
-// Class.register(InitMessage);
-
 class InitMessage extends Message{
     /**
      * @param {DeliberationInit} message
@@ -29424,7 +29325,6 @@ class InitMessage extends Message{
     }
 }
 Class.register(InitMessage);
-
 class AddrMessage extends Message {
     /**
      * @param {Array.<PeerAddress>} addresses
@@ -36563,7 +36463,7 @@ class PeerChannel extends Observable {
 
             // From the Bitcoin Reference:
             //  "Be careful of reject message feedback loops where two peers
-            //   each dont understand each others reject messages and so keep
+            //   each don’t understand each other’s reject messages and so keep
             //   sending them back and forth forever."
 
             // If the message does not make sense at a whole or we fear to get into a reject loop,

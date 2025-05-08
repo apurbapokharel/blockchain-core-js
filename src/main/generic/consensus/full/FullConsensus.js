@@ -187,7 +187,7 @@ class FullConsensus extends BaseConsensus {
      * @returns {Promise.<>}
      */
     async sendMessage(msg){
-        const mempoolCode = await this._mempool.pushMessage(msg);
+        const mempoolCode = await this._mempool.pushMessage(msg, this._ownAddress);
         //TODO: handle the mempool code switch case
     }
 

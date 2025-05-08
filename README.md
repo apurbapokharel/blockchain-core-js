@@ -30,3 +30,4 @@ This is a Proof of concept implementaion and is far from being a production read
 2. Play around with different nodes and send message in the same way
 3. To check the total number of messages in order to verify consistency `node remote.js message.count`
 4. To finalize the deliberation and mine the block with the deliberations stored in the block `node remote.js mining.enabled true`
+ 

@@ -157,6 +157,7 @@ const sources = {
         './src/main/generic/consensus/base/mempool/MempoolFilter.js',
         './src/main/generic/consensus/base/mempool/Mempool.js',
         './src/main/generic/consensus/base/message/DeliberationMessage.js',
+        './src/main/generic/consensus/base/message/DeliberationInit.js',
         './src/main/generic/consensus/InvRequestManager.js',
         './src/main/generic/consensus/BaseConsensusAgent.js',
         './src/main/generic/consensus/BaseConsensus.js',

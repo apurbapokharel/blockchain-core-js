@@ -4,7 +4,7 @@ class DeliMessage extends Message{
      */
     constructor(message) {
         super(Message.Type.MSG);
-        /** @type {TransacDeliberationMessagetion} */
+        /** @type {DeliberationMessage} */
         this._message = message;
     }
 

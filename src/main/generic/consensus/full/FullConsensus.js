@@ -3,8 +3,9 @@ class FullConsensus extends BaseConsensus {
      * @param {FullChain} blockchain
      * @param {Mempool} mempool
      * @param {Network} network
+     * //@UP @param {PublicKey} ownAddress
      */
-    constructor(blockchain, mempool, network) {
+    constructor(blockchain, mempool, network, ownAddress) {
         super(blockchain, mempool, network);
         /** @type {FullChain} */
         this._blockchain = blockchain;
@@ -12,6 +13,8 @@ class FullConsensus extends BaseConsensus {
         this._mempool = mempool;
         /** @type {BlockProducer} */
         this._producer = new BlockProducer(blockchain, blockchain.accounts, mempool, network.time);
+        /** @type {PublicKey} */
+        this._ownAddress = ownAddress;
     }
 
     //
@@ -176,9 +179,31 @@ class FullConsensus extends BaseConsensus {
     }
 
     // @UP
+    /**
+     * @param {DeliberationMessage} msg 
+     * OR
+     * @param {DeliberationInit} msg
+     * Should return
+     * @returns {Promise.<>}
+     */
     async sendMessage(msg){
         const mempoolCode = await this._mempool.pushMessage(msg);
         //TODO: handle the mempool code switch case
+    }
+
+    /**
+     * @param {BasicAddress} basicAddressSender 
+     * Should return
+     * @returns {Promise.<>}
+     */
+    async generateAndSendMessage(basicAddressSender){
+        const publicKeySender = basicAddressSender._address._publicKey;
+        const mempoolCode = await this._mempool.generateAndSendMessage(publicKeySender);
+        //TODO: handle the mempool code switch case
+    }
+    
+    async seeMapping(){
+        await this._mempool.seeMapping();
     }
 
     /**
@@ -220,7 +245,7 @@ class FullConsensus extends BaseConsensus {
      * @override
      */
     _newConsensusAgent(peer) {
-        return new FullConsensusAgent(this._blockchain, this._mempool, this._network.time, peer, this._invRequestManager, this._subscription);
+        return new FullConsensusAgent(this._blockchain, this._mempool, this._network.time, peer, this._invRequestManager, this._subscription, this._ownAddress);
     }
 
     /** @type {FullChain} */

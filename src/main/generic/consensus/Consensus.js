@@ -22,7 +22,14 @@ class Consensus {
         /** @type {Network} */
         const network = new Network(blockchain, netconfig, time);
 
-        return new FullConsensus(blockchain, mempool, network);
+        //@UP: Adding a new param that lets me send the address of the own node to class FullConsensus which gets passed on to FullConsensusAgent
+        // I need FullConsensusAgent to be able to have the address of itself so that it can know when it is their turn to generate and send new messages
+        // For this I am adding this paramater
+        // FIXME: TODO: Does there needs to be some form of checking to ensure that wrong or incorrect address is not sent during initialization? I think so but how?
+        /** @type {PublicKey} */        
+        const selfAddress = netconfig.peerAddress.publicKey;
+        return new FullConsensus(blockchain, mempool, network, selfAddress);
+
     }
 
     /**

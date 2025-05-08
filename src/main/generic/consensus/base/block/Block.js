@@ -353,10 +353,10 @@ class Block {
             // Hash.fromAny(plain.interlinkHash),
             Hash.fromAny(plain.bodyHash),
             Hash.fromAny(plain.accountsHash),
-            plain.nBits,
+            //plain.nBits,
             plain.height,
             plain.timestamp,
-            plain.nonce,
+            //plain.nonce,
             plain.version
         );
         // const interlink = new BlockInterlink((plain.interlink.hashes || plain.interlink).map(h => Hash.fromAny(h)), Hash.fromAny(plain.prevHash));

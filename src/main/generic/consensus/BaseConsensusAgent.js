@@ -107,10 +107,6 @@ class BaseConsensusAgent extends Observable {
         /** @type {Set.<{obj: Observable, type: string, id: number}>} */
         this._listenersToDisconnect = new Set();
 
-        //@UP: 
-        /** @type {Deliberation} */
-        this._deliberation = new Deliberation();
-
         // Listen to consensus messages from the peer.
         this._onToDisconnect(peer.channel, 'inv', msg => this._onInv(msg));
         this._onToDisconnect(peer.channel, 'block', msg => this._onBlock(msg));
@@ -118,7 +114,7 @@ class BaseConsensusAgent extends Observable {
         this._onToDisconnect(peer.channel, 'tx', msg => this._onTx(msg));
         this._onToDisconnect(peer.channel, 'msg', msg => this._onMsg(msg));
         this._onToDisconnect(peer.channel, 'init-deli', msg => this._onInitDeli(msg));
-        this._onToDisconnect(peer.channel, 'before-init', msg => this._beforeInit(msg));
+        
         this._onToDisconnect(peer.channel, 'not-found', msg => this._onNotFound(msg));
 
         this._onToDisconnect(peer.channel, 'subscribe', msg => this._onSubscribe(msg));
@@ -130,7 +126,6 @@ class BaseConsensusAgent extends Observable {
         this._onToDisconnect(peer.channel, 'transaction-receipts', msg => this._onTransactionReceipts(msg));
 
         this._onToDisconnect(peer.channel, 'mempool', msg => this._onMempool(msg));
-        // this._onToDisconnect(peer.channel, 'mempool', msg => this.sendMessage(msg));
 
         this._onToDisconnect(peer.channel, 'get-head', msg => this._onGetHead(msg));
         this._onToDisconnect(peer.channel, 'head', msg => this._onHead(msg));
@@ -294,12 +289,11 @@ class BaseConsensusAgent extends Observable {
     }
 
     relayMessage(message) {
-        this._deliberation.registerUtterance(message);
         // console.log("relay message");
         // @UP: Dont know what this means but; Only relay message if it matches the peer's subscription.
         
         const vector = InvVector.fromMessage(message);
-
+        
         // Don't relay message to this peer if it already knows it.
         if (this._knownObjects.contains(vector)) {
             Log.v(BaseConsensusAgent, `Not sending ${message.hash()} to ${this.peer.peerAddress}: already knows`);
@@ -540,8 +534,7 @@ class BaseConsensusAgent extends Observable {
             // Filter out objects that we are not interested in.
             if (!this._shouldRequestData(vector)) {
                 continue;
-            }
-
+            }                  
             switch (vector.type) {
                 case InvVector.Type.BLOCK: {
                     const block = await this._getBlock(vector.hash, /*includeForks*/ true); // eslint-disable-line no-await-in-loop
@@ -565,7 +558,16 @@ class BaseConsensusAgent extends Observable {
                 }
                 case InvVector.Type.MESSAGE: {
                     const message = this._getMessage(vector.hash);
-                    // console.log("hash inside case",vector.hash, message);
+                    if (!message) {
+                        unknownMsgs.push(vector);
+                        this._onNewMessageAnnounced(vector.hash);
+                    } else {
+                        this._onKnownMessageAnnounced(vector.hash, message);
+                    }
+                    break;
+                }
+                case InvVector.Type.INITMESSAGE: {
+                    const message = this._getInitMessage(vector.hash);                    
                     if (!message) {
                         unknownMsgs.push(vector);
                         this._onNewMessageAnnounced(vector.hash);
@@ -605,7 +607,7 @@ class BaseConsensusAgent extends Observable {
         // Store unknown vectors in objectsToRequest.
         this._blocksToRequest.enqueueAll(vector.filter(v => v.type === InvVector.Type.BLOCK));
         this._txsToRequest.enqueueAll(vector.filter(v => v.type === InvVector.Type.TRANSACTION));
-        this._msgsToRequest.enqueueAll(vector.filter(v => v.type === InvVector.Type.MESSAGE));
+        this._msgsToRequest.enqueueAll(vector.filter(v => v.type === InvVector.Type.MESSAGE || v.type === InvVector.Type.INITMESSAGE));
 
         // Clear the request throttle timeout.
         this._timers.clearTimeout('inv');
@@ -672,6 +674,17 @@ class BaseConsensusAgent extends Observable {
      * @abstract
      */
     _getMessage(hash) {
+        // MUST be implemented by subclasses.
+        throw new Error('not implemented');
+    }
+
+    /**
+     * @param {Hash} hash
+     * @returns {?DeliberationInit}
+     * @protected
+     * @abstract
+     */
+    _getInitMessage(hash) {
         // MUST be implemented by subclasses.
         throw new Error('not implemented');
     }
@@ -971,7 +984,7 @@ class BaseConsensusAgent extends Observable {
         const vector = new InvVector(InvVector.Type.MESSAGE, hash);
         if (!this._objectsInFlight.contains(vector) && !this._objectsThatFlew.contains(vector)) {
             Log.w(BaseConsensusAgent, `Unsolicited message ${hash} received from ${this._peer.peerAddress}, discarding`);
-            console.log("Inside");
+            console.log("Received message not requested, Discarding it");
             return;
         }
         
@@ -1015,15 +1028,54 @@ class BaseConsensusAgent extends Observable {
     }
 
     async _onInitDeli(msg){
-        if (this._deliberation.problem === undefined || this._deliberation.isEnd){
-            this._deliberation = new Deliberation(msg._decodedMessage, msg._rounds, msg._turns, msg._participants)
+        msg.message.encodeMessage();
+        const hash = msg.message.hash();
+        
+        // Check if we have requested this transaction.
+        const vector = new InvVector(InvVector.Type.INITMESSAGE, hash);
+        if (!this._objectsInFlight.contains(vector) && !this._objectsThatFlew.contains(vector)) {
+            Log.w(BaseConsensusAgent, `Unsolicited message ${hash} received from ${this._peer.peerAddress}, discarding`);
+            console.log("Received message not requested, Discarding it");
+            return;
         }
-    }
+        
+        this._invRequestManager.noteVectorReceived(InvVector.fromMessage(msg.message));
 
-    async _beforeInit(msg){
-        if (this._deliberation.problem === undefined || this._deliberation.isEnd){
-            this._deliberation = new Deliberation(msg._decodedMessage, msg._rounds, msg._turns, msg._participants)
-        }
+        // Mark object as received.
+        this._onObjectReceived(vector);
+
+        // Mark message as processing.
+        this._objectsProcessing.add(vector);
+
+        // @UP: TODO: Skipped this just as i have skippe this in relayMessage
+        // @UP: Instead we directly process the message because that is what we need to do anyway
+        //Process message if we subscribed for this transaction.
+        // if (this._localSubscription.matchesTransaction(msg.transaction)) {
+        //     await this._processTransaction(hash, msg.transaction);
+        // }
+
+        await this._processMessage(hash, msg.message);
+
+        const msgRequest = this._pendingRequests.get(vector);
+        if (msgRequest) {
+            this._pendingRequests.remove(vector);
+            this._timers.clearTimeout(`tx-request-${vector.hash.toBase64()}`);
+            for (const {resolve} of msgRequest) {
+                try {
+                    resolve(msg.message);
+                } catch (e) {
+                    // Ignore
+                }
+            }
+        } 
+
+        // @UP: TODO: COmmenenting anything to do with subscription
+        // else if (!this._localSubscription.matchesTransaction(msg.transaction) && this._lastSubscriptionChange + BaseConsensusAgent.SUBSCRIPTION_CHANGE_GRACE_PERIOD > Date.now()) {
+        //     this._peer.channel.close(CloseType.TRANSACTION_NOT_MATCHING_SUBSCRIPTION, 'received transaction not matching our subscription');
+        // }
+
+        // Mark object as processed.
+        this._onObjectProcessed(vector);
     }
 
     /**
@@ -1174,7 +1226,7 @@ class BaseConsensusAgent extends Observable {
         // Send back all known objects.
         // Send notFound for unknown objects.
         const unknownObjects = [];
-        for (const vector of msg.vectors) {
+        for (const vector of msg.vectors) {            
             switch (vector.type) {
                 case InvVector.Type.BLOCK: {
                     const block = await this._getRawBlock(vector.hash, /*includeForks*/ false); // eslint-disable-line no-await-in-loop
@@ -1201,6 +1253,20 @@ class BaseConsensusAgent extends Observable {
                 }
                 case InvVector.Type.MESSAGE: {
                     const msg = this._getMessage(vector.hash);
+                    if (msg) {
+                        // We have found a requested message, send it back to the sender.
+                        this._peer.channel.msg(msg);
+                        //@UP TODO: The message-relayed event should be handled appropriately in the future
+                        this.fire('message-relayed', msg);
+                    } else {
+                        // console.log("else");
+                        // Requested transaction is unknown.
+                        unknownObjects.push(vector);
+                    }
+                    break;
+                }
+                case InvVector.Type.INITMESSAGE: {
+                    const msg = this._getInitMessage(vector.hash);
                     if (msg) {
                         // We have found a requested message, send it back to the sender.
                         this._peer.channel.msg(msg);

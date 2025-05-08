@@ -862,8 +862,8 @@ class Client {
     }
 
     async sendMessage(message){
-        let address = await this._network.getOwnAddress()        
-        let msg = new DeliberationMessage(message, address._address._publicKey, Math.floor(Date.now()/1000));        
+        let basicAddressSender = await this._network.getOwnAddress()        
+        let msg = new DeliberationMessage(message, basicAddressSender._address._publicKey, Math.floor(Date.now()/1000));        
         msg.encodeMessage()
         const consensus = await this._consensus;
         let consensusResult = await consensus.sendMessage(msg);
@@ -874,19 +874,28 @@ class Client {
         const problem = deliParams.problem;
         const rounds = deliParams.rounds;
         const turns = deliParams.turns;
-
         let address = (await this._network.getOwnAddress())._address._publicKey.toHex();            
         let peerAddresses = await this._network.getAddresses();  
         let arrayOfPeers = [];
-        arrayOfPeers.push(address);
+        arrayOfPeers.push(address);        
         for (const address of peerAddresses){            
             arrayOfPeers.push(address._address._publicKey.toHex());  
         }        
-        let msg = new InitMessage(problem, rounds, turns, arrayOfPeers);        
+        let msg = new DeliberationInit(problem, rounds, turns, arrayOfPeers);        
         msg.encodeMessage()
         const consensus = await this._consensus;
-        let consensusResult = await consensus.sendInitMessage(msg);
+        let consensusResult = await consensus.sendMessage(msg);
         //TODO: @UP handle the switch cases as handled above in sendTransaction
+    }
+
+    async startDeliberation(){
+        //type of publicKeySender is BasicAddress
+        const basicAddressSender = await this._network.getOwnAddress();         
+        let result = await this._consensus.generateAndSendMessage(basicAddressSender);
+    }
+
+    async seeMapping(){
+        await this._consensus.seeMapping();
     }
 
     /**

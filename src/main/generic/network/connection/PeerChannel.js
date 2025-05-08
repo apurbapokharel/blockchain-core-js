@@ -185,11 +185,14 @@ class PeerChannel extends Observable {
     }
 
     /**
-     * @param {DeliberationMessage} message
+     * @param {DeliberationMessage || DeliberationInit} message
      * @return {boolean}
     */
     msg(message) {
-        return this._send(new DeliMessage(message));
+        if(message instanceof DeliberationMessage)
+            return this._send(new DeliMessage(message));
+        else
+            return this._send(new InitMessage(message));
     }
 
     /**

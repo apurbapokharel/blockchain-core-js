@@ -27,8 +27,11 @@ class InvVector {
     }
 
     static fromMessage(message) {
-        const hash = message.hash();        
-        return new InvVector(InvVector.Type.MESSAGE, hash);
+        const hash = message.hash();  
+        if(message instanceof DeliberationMessage)      
+            return new InvVector(InvVector.Type.MESSAGE, hash);
+        else
+            return new InvVector(InvVector.Type.INITMESSAGE, hash);
     }
 
     /**
@@ -129,6 +132,7 @@ InvVector.Type = {
     TRANSACTION: 1,
     BLOCK: 2,
     MESSAGE: 3,
+    INITMESSAGE: 4,
 
     /**
      * @param {SerialBuffer} buf

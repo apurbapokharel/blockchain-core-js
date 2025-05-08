@@ -6,8 +6,9 @@ class FullConsensusAgent extends BaseConsensusAgent {
      * @param {Peer} peer
      * @param {InvRequestManager} invRequestManager
      * @param {Subscription} targetSubscription
+     * @param {PublicKey} ownAddress
      */
-    constructor(blockchain, mempool, time, peer, invRequestManager, targetSubscription) {
+    constructor(blockchain, mempool, time, peer, invRequestManager, targetSubscription, ownAddress) {
         super(time, peer, invRequestManager, targetSubscription);
         /** @type {FullChain} */
         this._blockchain = blockchain;
@@ -35,6 +36,10 @@ class FullConsensusAgent extends BaseConsensusAgent {
         // The block hash that we want to learn to consider the sync complete.
         /** @type {Hash} */
         this._syncTarget = peer.headHash;
+
+        //@UP
+        /** @type {PublicKey} */
+        this._ownAddress = ownAddress;
 
         /** @type {RateLimit} */
         this._chainProofLimit = new RateLimit(FullConsensusAgent.CHAIN_PROOF_RATE_LIMIT);
@@ -215,6 +220,16 @@ class FullConsensusAgent extends BaseConsensusAgent {
 
     /**
      * @param {Hash} hash
+     * @returns {?DeliberationInit}
+     * @protected
+     * @override
+     */
+    _getInitMessage(hash) {
+        return this._mempool.getInitMessage(hash);
+    }
+
+    /**
+     * @param {Hash} hash
      * @param {Block} block
      * @returns {void}
      * @protected
@@ -373,7 +388,7 @@ class FullConsensusAgent extends BaseConsensusAgent {
      * @protected
      */
     async _processMessage(hash, message) {
-        const result = await this._mempool.pushMessage(message);
+        const result = await this._mempool.pushMessage(message, this._ownAddress);
         //@UP: process the Mempool returned code
     }
 

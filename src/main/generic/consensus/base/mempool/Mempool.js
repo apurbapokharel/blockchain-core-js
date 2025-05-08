@@ -1,3 +1,5 @@
+const axios = require('axios');
+
 class Mempool extends Observable {
     /**
      * @param {IBlockchain} blockchain
@@ -28,6 +30,23 @@ class Mempool extends Observable {
         /** @type {HashMap.<Hash, DeliberationMessage>} */
         this._messagesByHash = new HashMap();
 
+        //@UP: For init delimessage mempool
+        /** @type {HashMap.<Hash, DeliberationInit>} */
+        this._initMessageByHash = new HashMap();
+        
+        //@UP: To keep track of the deliberation state and order
+        /** @type {Deliberation} */
+        this._deliberation = new Deliberation();
+
+        //@UP: Session id for a deliberation
+        /** @type {String} */
+        this._sessionId = "";
+
+        //@UP:  
+        // The value should have been DeliberationMessage but making its a string for storage purposes
+        /** @type {HashMap.<(round,turn, speakerIndex), String>} */
+        this._messagesByRounds = new HashMap();
+
         // Listen for changes in the blockchain head to evict transactions that have become invalid.
         blockchain.on('head-changed', (block, rebranching) => {
             if (!rebranching) {
@@ -49,9 +68,173 @@ class Mempool extends Observable {
         return this._synchronizer.push(() => this._pushTransaction(transaction));
     }
 
+
+    //@UP: Adding replies to mapping so that they can be used during the reflection round
+    addReplyToMapping(reply, currentRound, currentTurn, currentSpeaker){
+        //the reply for the given round should not exist
+        //arrays are used by reference so using string which are refered by value
+        const tuple = [currentRound, currentTurn, currentSpeaker];
+        const key = tuple.join(',');
+        const status = this._messagesByRounds.contains(key);
+        if(status){
+            console.log("ERROR, THIS SHOULD NEVER BE THE CASE");            
+        }
+        else{
+            this._messagesByRounds.put(key, reply);
+        }
+    }
+
+    getPrevReply(currentRound, currentTurn, currentSpeakerIndex){
+        // console.log("oarams",currentRound, currentTurn, currentSpeakerIndex);
+        
+        let neighIndex = currentSpeakerIndex - 1;
+        let prevRound = 0;
+        let prevTurn = 0;
+        if(neighIndex == -1){
+                neighIndex = this._deliberation.participants.length - 1; 
+        }
+        if(currentTurn == 2){
+            prevTurn = currentTurn - 1;
+            prevRound = currentRound;
+        }
+        else{
+            prevTurn = currentTurn;
+            prevRound = currentRound - 1;    
+        }
+        let key1 = [prevRound, prevTurn, currentSpeakerIndex];
+        let key2 = [prevRound, prevTurn, neighIndex];
+        key1 = key1.join(',');
+        key2 = key2.join(',');
+        // console.log(key1, key2);
+        return [this._messagesByRounds.get(key1), this._messagesByRounds.get(key2)];
+    }
+
+    //@UP: for testing only
+    async seeMapping(){
+        
+        for (const [key, value] of this._messagesByRounds.entryIterator()) {
+            console.log(key, value);
+        }
+
+        // console.log(this._messagesByRounds.get("key"));
+        // let key1 = [1, 2, 3];
+        // key1 = key1.join(',');
+        // this._messagesByRounds.put(key1, "I am in favor of AI regulation. AI regulation should be global. The government should establish an AI agency. The AI agency should set standards for AI development. AI developers should be licensed.")        
+        // console.log(this._messagesByRounds.get(key1));        
+        // this._messagesByRounds.remove(key1);
+    }
+    /**
+     * @param {PublicKey} publicKeySender
+    */    
+    //@UP: This method can be exposed to reentrancy/DDoS/Resource Exhaustion Attacks.
+    // If, we check address == currentSpeaker and generate new utterance but
+    // we never increase the speakerIndex (push message does this primarily)
+    // If that happens this function can be continously called to keep on generating new messages
+    // FIX: we increase the speaker index so that we prevent this viscious cycle
+    // FIX: we also push the message from this function so that function pushMessage's logic can be sperated for messaged that are relayed
+    async generateAndSendMessage(publicKeySender){
+        // check to see if address == currentSpeaker then genereate message
+        // see the current round info to know which method to call with which parameters
+        // create a new delibertaionMessage from reply
+        // push message
+        const currentSpeakerAddress = this._deliberation.currentSpeaker;
+        const publicKeyHex = publicKeySender.toHex();
+        if(currentSpeakerAddress === publicKeyHex){
+            const currentRound = this._deliberation.currentRound;
+            const currentTurn = this._deliberation.currentTurn; 
+            const currentSpeakerIndex = this._deliberation.speakerIndex;
+            this._deliberation.increaseSpeakerIndex();
+            let response = "";
+            // Can add independent logic for each round of deliberation and call seperate methods acordingly
+            if(currentRound==1){
+                response = await axios.post(`http://127.0.0.1:5000/round1`, {
+                    params: {
+                        session_id: this._sessionId
+                    }
+                });
+            }
+            else{
+                const replies = this.getPrevReply(currentRound, currentTurn, currentSpeakerIndex);
+                const user_reply = replies[0];
+                const neighbour_reply = replies[1];
+                // console.log("Replies", user_reply, neighbour_reply);
+                //FIXME: Model sometime generates empty reponse so will loop till non empty response generated
+                while(true){
+                    response = await axios.post(`http://127.0.0.1:5000/round2`, {
+                        params: {
+                            session_id: this._sessionId,
+                            user_reply: user_reply,
+                            neighbour_reply: neighbour_reply
+                        }
+                    });
+                    if(response.data.result.response.length != 0)
+                        break;    
+                }
+            }
+            let reply = response.data.result.response;
+            reply = reply.replace(/\n/g, ' ').trim();
+            this.addReplyToMapping(reply, currentRound, currentTurn, currentSpeakerIndex);
+            console.log("generated reply is", reply);
+            const message = new DeliberationMessage(reply, publicKeySender, Math.floor(Date.now()/1000));     
+            message.encodeMessage();
+            // console.log(message.hash());
+            this._synchronizer.push(() => this._pushMessage(message));
+        }
+        else{
+            console.log("Not current peers turn to speak");
+        }
+        this._deliberation.printDeliberationState();
+    }
+
     // @UP
-    pushMessage(message) {
-        return this._synchronizer.push(() => this._pushMessage(message));
+    /**
+     * @param {DeliberationMessage} message
+     * OR
+     * @param {DeliberationInit} message
+     * @param {PublicKey} ownAddress
+    */  
+    async pushMessage(message, ownAddress) { 
+        if(message instanceof DeliberationInit){
+            if (this._deliberation.problem === undefined || this._deliberation.isEnd){
+                console.log("Init deli called");
+                this._deliberation = new Deliberation(message._decodedProblem, message._rounds, message._turns, message._participants, false);
+                const response = await axios.post(`http://127.0.0.1:5000/init`, {
+                    params: {
+                        problem: message._decodedProblem,
+                        rounds: message._rounds,
+                        turns: message._turns,
+                        agents: message._participants
+                    }
+                });           
+                this._sessionId = response.data.session_id;
+                this._synchronizer.push(() => this._pushMessage(message));                
+            }
+            else{
+                console.log("No need to init new deliberation");
+            }
+        }
+        if(message instanceof DeliberationMessage){
+            console.log("reply", message._decodedMessage);
+            //1. check if the message can be accepted
+                //a. Register utterance will check and return false 
+                    // if deliberation is alread end or speaking turn violated
+                //b. Register uttreance will also increase the turns and rounds appropriately
+            const currentRound = this._deliberation.currentRound;
+            const currentTurn = this._deliberation.currentTurn; 
+            const currentSpeakerIndex = this._deliberation.speakerIndex;
+            const status = this._deliberation.registerUtterance(message)
+            if(status){
+                this.addReplyToMapping(message.decodedMessage, currentRound, currentTurn, currentSpeakerIndex);
+                //2. If the message can be accepted relay the message 
+                this._synchronizer.push(() => this._pushMessage(message));
+            }
+            //3. Now check if its this peers turn to speak
+            const currentSpeakerAddress = this._deliberation.currentSpeaker;
+            if(currentSpeakerAddress === ownAddress.toHex() && ! this._deliberation.isEnd){
+                //a. If then generateMsg and pushMessage again
+                this.generateAndSendMessage(ownAddress);
+            }
+        }
     }
 
     /**
@@ -184,12 +367,17 @@ class Mempool extends Observable {
     // @UP
     async _pushMessage(message) {
         // Check if we already know this message.
-        const hash = message.hash();
-        if (this._messagesByHash.contains(hash)) {
+        const hash = message.hash();        
+        if (this._messagesByHash.contains(hash) || this._initMessageByHash.contains(hash)) {
             return Mempool.ReturnCode.KNOWN;
         }
 
-        this._messagesByHash.put(hash, message);
+        if(message instanceof DeliberationInit){
+            this._initMessageByHash.put(hash, message);
+        }
+        else{
+            this._messagesByHash.put(hash, message);
+        }
 
         this.fire('message-added', message);
 
@@ -260,10 +448,19 @@ class Mempool extends Observable {
     // @UP
     /**
      * @param {Hash} hash
-     * @returns {Transaction}
+     * @returns {DeliberationMessage}
      */
     getMessage(hash) {
         return this._messagesByHash.get(hash);
+    }
+
+    // @UP
+    /**
+     * @param {Hash} hash
+     * @returns {DeliberationInit}
+     */
+    getInitMessage(hash) {
+        return this._initMessageByHash.get(hash);
     }
 
     /**
@@ -297,7 +494,7 @@ class Mempool extends Observable {
      * @param {number} [maxSize]
      * @yields {IterableIterator.<Transaction>}
      */
-     *messageGenerator(maxSize = Infinity) {
+    *messageGenerator(maxSize = Infinity) {
         let size = 0;
         for (const [hash, msg] of this._messagesByHash.entryIterator()) {
 

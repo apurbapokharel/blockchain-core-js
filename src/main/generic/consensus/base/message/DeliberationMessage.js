@@ -30,7 +30,7 @@ class DeliberationMessage {
     static unserialize(buf) {
         const senderPubKey = PublicKey.unserialize(buf);
         const timeStamp = buf.readUint32();
-        const length = buf.readUint8();
+        const length = buf.readUint32();
         const uint8Array = new Uint8Array(length);
         for (let i = 0; i < length; i++) {
             uint8Array[i] = buf.readUint8();
@@ -44,7 +44,7 @@ class DeliberationMessage {
         buf = buf || new SerialBuffer(this.serializedSize);
         this._senderPubKey.serialize(buf);
         buf.writeUint32(this._timestamp);
-        buf.writeUint8(this._length);
+        buf.writeUint32(this._length);
         for (let i = 0; i < this._length; i++) {
             buf.writeUint8(this._encodedMessage[i]);
         }
@@ -54,7 +54,7 @@ class DeliberationMessage {
     /** @type {number} */
     get serializedSize() {
         return this._senderPubKey.serializedSize  
-            + /*length*/ 1
+            + /*length*/ 4
             + /*timestamp*/ 4
             + 1 * this._length /* size of array = length * space for each 8 bit (1) */
     }

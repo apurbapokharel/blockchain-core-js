@@ -93,7 +93,7 @@ class Mempool extends Observable {
         if(neighIndex == -1){
                 neighIndex = this._deliberation.participants.length - 1; 
         }
-        if(currentTurn == 2){
+        if(currentTurn >= 2){
             prevTurn = currentTurn - 1;
             prevRound = currentRound;
         }

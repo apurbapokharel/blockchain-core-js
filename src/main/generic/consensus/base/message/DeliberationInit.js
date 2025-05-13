@@ -42,14 +42,14 @@ class DeliberationInit{
 
     static unserialize(buf) {
         let decoder = new TextDecoder();
-        const length = buf.readUint8();
+        const length = buf.readUint32();
         const uint8Array = new Uint8Array(length);
         for (let i = 0; i < length; i++) {
             uint8Array[i] = buf.readUint8();
         }
         const rounds = buf.readUint32();
         const turns = buf.readUint32();
-        const length2 = buf.readUint8();
+        const length2 = buf.readUint32();
         const uint8Array2 = new Uint8Array(length2);
         for (let i = 0; i < length2; i++) {
             uint8Array2[i] = buf.readUint8();
@@ -68,13 +68,13 @@ class DeliberationInit{
 
     serialize(buf) {
         buf = buf || new SerialBuffer(this.serializedSize);
-        buf.writeUint8(this._lengthOfProblem);
+        buf.writeUint32(this._lengthOfProblem);
         for (let i = 0; i < this._lengthOfProblem; i++) {
             buf.writeUint8(this._encodedProblem[i]);
         }
         buf.writeUint32(this._rounds);
         buf.writeUint32(this._turns);
-        buf.writeUint8(this._totalLength);
+        buf.writeUint32(this._totalLength);
         for (let i = 0; i < this._totalLength; i++) {
             buf.writeUint8(this._encodedParticipants[i]);
         }
@@ -83,11 +83,11 @@ class DeliberationInit{
 
     /** @type {number} */
     get serializedSize() {
-        return 1 
+        return 4
             + 1 * this._lengthOfProblem
             + 4 /*rounds*/
             + 4 /*turns*/
-            + 1
+            + 4
             + 1 * this._totalLength /* size of array = length * space for each 8 bit (1) */
     }
 }

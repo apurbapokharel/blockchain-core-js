@@ -111,17 +111,27 @@ class Mempool extends Observable {
 
     //@UP: for testing only
     async seeMapping(){
-        
-        for (const [key, value] of this._messagesByRounds.entryIterator()) {
-            console.log(key, value);
+        function formatDuration(timeA, timeB) {
+            const milliseconds = timeB - timeA;
+            const totalSeconds = Math.floor(milliseconds / 1000);
+            const days = Math.floor(totalSeconds / (3600 * 24));
+            const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const secs = totalSeconds % 60;
+            const ms = milliseconds % 1000;
+            return `${days}d ${hours}h ${minutes}m ${secs}s ${ms}ms`;
         }
-
-        // console.log(this._messagesByRounds.get("key"));
-        // let key1 = [1, 2, 3];
-        // key1 = key1.join(',');
-        // this._messagesByRounds.put(key1, "I am in favor of AI regulation. AI regulation should be global. The government should establish an AI agency. The AI agency should set standards for AI development. AI developers should be licensed.")        
-        // console.log(this._messagesByRounds.get(key1));        
-        // this._messagesByRounds.remove(key1);
+        // for (const [key, value] of this._messagesByRounds.entryIterator()) {
+        //     console.log(key, value);
+        // }
+        let timesArray = this._deliberation.roundTime;
+        let timeDifference = []
+        for(let i = 0; i < timesArray.length-1; i++){
+            timeDifference.push(formatDuration(timesArray[i], timesArray[i+1]));
+        }
+        timeDifference.push(formatDuration(timesArray[0], timesArray[timesArray.length-1]));        
+        console.log("TimeArray", timesArray);
+        console.log("TimeDifference", timeDifference);
     }
     /**
      * @param {PublicKey} publicKeySender
@@ -139,11 +149,16 @@ class Mempool extends Observable {
         // push message
         const currentSpeakerAddress = this._deliberation.currentSpeaker;
         const publicKeyHex = publicKeySender.toHex();
+        if(this._deliberation.startTime == -1){
+            console.log("set start time");
+            this._deliberation.startDeliberation();
+        }
         if(currentSpeakerAddress === publicKeyHex){
             const currentRound = this._deliberation.currentRound;
             const currentTurn = this._deliberation.currentTurn; 
             const currentSpeakerIndex = this._deliberation.speakerIndex;
-            this._deliberation.increaseSpeakerIndex();
+            //TODO: this should be here and not below to make reentracy safe, but for data collection putting down
+            // this._deliberation.increaseSpeakerIndex();
             let response = "";
             // Can add independent logic for each round of deliberation and call seperate methods acordingly
             if(currentRound==1){
@@ -175,6 +190,7 @@ class Mempool extends Observable {
             reply = reply.replace(/\n/g, ' ').trim();
             this.addReplyToMapping(reply, currentRound, currentTurn, currentSpeakerIndex);
             console.log("generated reply is", reply);
+            this._deliberation.increaseSpeakerIndex();
             const message = new DeliberationMessage(reply, publicKeySender, Math.floor(Date.now()/1000));     
             message.encodeMessage();
             // console.log(message.hash());

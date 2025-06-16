@@ -15,6 +15,16 @@ class Deliberation extends Observable{
         this._currentTurn = 1;
         this._speakerIndex = 0;
         this._isEnd = isEnded;
+        // time is saved in millisecond unix time
+        this._startTime = -1;
+        this._endTime = -1;
+        // [
+        // 0 : (deliberation_start, round1_start), 
+        // 1 : (round1_end, round2_start, turn1_start),
+        // 2: (turn1_end, turn2_start),
+        // 3: (turn2_end, round2_end, deliberation_end)
+        // ]
+        this._roundTimes = [];
     }
 
     // generateUtterance(){
@@ -25,11 +35,25 @@ class Deliberation extends Observable{
         Log.e(Deliberation, msg);
     }
 
+    formatDuration(milliseconds) {
+        const totalSeconds = Math.floor(milliseconds / 1000);
+        const days = Math.floor(totalSeconds / (3600 * 24));
+        const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const secs = totalSeconds % 60;
+        const ms = milliseconds % 1000;
+        return `${days}d ${hours}h ${minutes}m ${secs}s ${ms}ms`;
+    }
+
     /**
      * 
      * @param {DeliberationMessage} msg 
      */
     registerUtterance(msg){
+        if(this.startTime == -1){
+            console.log("set start time");
+            this.startDeliberation();
+        }
         // this.printDeliberationState();
         const sender = msg.senderPubKey.toHex();
         // console.log(sender, this.participants[this.speakerIndex], sender !== this.participants[this.speakerIndex]);
@@ -77,12 +101,22 @@ class Deliberation extends Observable{
     }
 
     endDeliberation(){
+        this._endTime = Date.now();
         this._isEnd = true;
+    }
+
+    startDeliberation(){
+        const startTime = Date.now();
+        this._roundTimes.push(startTime)
+        this._startTime = startTime;
     }
 
     increaseSpeakerIndex(){
         this._speakerIndex += 1;
         if(this.speakerIndex === this.participants.length){
+            console.log("appending to times");
+            const time = Date.now();
+            this._roundTimes.push(time)
             if(this.currentRound === 2){
                 this.increaseTurn();
             }
@@ -126,8 +160,19 @@ class Deliberation extends Observable{
     }
     
     get currentSpeaker(){
-        return this._participants[this._speakerIndex]
+        return this._participants[this._speakerIndex];
+    }
+
+    get startTime(){
+        return this._startTime;
+    }
+
+    get endTime(){
+        return this._endTime;
     }
     
+    get roundTime(){
+        return this._roundTimes;
+    }
 } 
 Class.register(Deliberation);

@@ -19724,7 +19724,6 @@ MempoolFilter.CONTRACT_VALUE = 0;
 Class.register(MempoolFilter);
 
 const axios = require('axios');
-const { time, log } = require('console');
 
 class Mempool extends Observable {
     /**

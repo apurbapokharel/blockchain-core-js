@@ -41035,7 +41035,9 @@ class Miner extends Observable {
             // after every blockchain head change and then fires 'transactions-ready'
             // when the eviction process finishes. Restart work on the next block
             // with fresh transactions when this fires.
-            this._mempool.on('transactions-ready', () => this._startWork());
+            this._mempool.on('transactions-ready', () => {
+                if (this._loopEnabled) this._startWork();
+            });
 
             // Immediately start processing transactions when they come in.
             this._mempool.on('transaction-added', () => this._mempoolChanged = true);
@@ -41058,6 +41060,8 @@ class Miner extends Observable {
         this._lastHashrate = Date.now();
         this._hashrateWorker = setInterval(() => this._updateHashrate(), 1000);
         this._retry = 0;
+
+        this._loopEnabled = true;
 
         // Tell listeners that we've started working.
         this.fire('start', this);
@@ -41155,7 +41159,7 @@ class Miner extends Observable {
             setTimeout(() => this.startWork(), 100);
         } finally {
             this._restarting = false;
-            setTimeout(() => this.startWork(), 3000);
+            if (this._loopEnabled) setTimeout(() => this.startWork(), 3000);
         }
     }
 
@@ -41273,6 +41277,7 @@ class Miner extends Observable {
      * @fires Miner#stop
      */
      stopWork() {
+        this._loopEnabled = false;
         this._stopWork();
     }
     /**

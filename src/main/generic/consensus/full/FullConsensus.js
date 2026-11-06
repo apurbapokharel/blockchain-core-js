@@ -202,6 +202,10 @@ class FullConsensus extends BaseConsensus {
         //TODO: handle the mempool code switch case
     }
     
+    getDeliberationState(){
+        return this._mempool.getDeliberationState();
+    }
+
     async seeMapping(){
         await this._mempool.seeMapping();
     }

@@ -1,0 +1,18 @@
+[
+  {"id":"1","title":"Store clearance","answer":"$5","value":5,"tolerance":0.01,
+   "problem":"Anns favorite store was having a summer clearance. For $75 she bought 5 pairs of shorts for $7 each and 2 pairs of shoes for $10 each. She also bought 4 tops, all at the same price. How much did each top cost?"},
+  {"id":"2","title":"Rent and salary","answer":"$1000","value":1000,"tolerance":0.01,
+   "problem":"Mrs. Snyder used to spend 40% of her monthly income on rent and utilities. Her salary was recently increased by $600 so now her rent and utilities only amount to 25% of her monthly income. How much was her previous monthly income?"},
+  {"id":"2.5","title":"Dropped bills","answer":"153 bills","value":153,"tolerance":0.01,
+   "problem":"Ethan withdraws $1200 in $50 bills. He drops 3 of them and spends 40% of the remainder. Then he earns $900 more. He converts all his money into $10 bills. How many $10 bills does he have?"},
+  {"id":"3","title":"Pizza slices","answer":"18 slices","value":18,"tolerance":0.01,
+   "problem":"Bryce and four of his friends each ordered their own pizzas after football practice. Each pizza had 12 slices. Bryce and two friends ate 2/3 of their pizzas. The two remaining friends ate 3/4 of their pizzas. How many slices of pizza were left?"},
+  {"id":"4","title":"Triathlon","answer":"59 minutes","value":59,"tolerance":0.01,
+   "problem":"Jon runs a triathlon. It takes him 40 minutes for the swim, an hour and 20 minutes for the bike ride and 50 minutes for the run. Compared to Jon, James finishes the swim 10% faster but takes 5 minutes longer on the bike. If Jon won by 10 minutes, how long did it take James to do the run?"},
+  {"id":"5","title":"Mixed bills","answer":"70 bills","value":70,"tolerance":0.01,
+   "problem":"Alex has $2400 in a mix of $100 and $50 bills (equal number of each). He loses half of both of his bills. Then he spends $400 and earns back 150% of that. He converts all remaining money into $20 bills. How many $20 bills does he get?"},
+  {"id":"7","title":"Find c","answer":"10.5","value":10.5,"tolerance":0.01,
+   "problem":"If a/b=3/4 and 8a+5b=22 and a+c = 12 ,then find the value of c."},
+  {"id":"10","title":"Factory output","answer":"about 24%","value":24.24,"tolerance":0.5,
+   "problem":"The output of a factory was increased by 10% to keep up with rising demand. To handle the holiday rush, this new output was increased by 20%. By approximately what percent would the output now have to be decreased in order to restore the original output?"}
+]

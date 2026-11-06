@@ -32,7 +32,11 @@ nodes. The user presents from a laptop over VPN and SSH, and will record a backu
 - Branch `demo` is based on `origin/deli1` at `60fb0fd`.
 - Miner patch in `src/main/generic/miner/Miner.js` and `dist/node.js`: a `_loopEnabled` flag so that mining
   stays off until asked. With mining off on all nodes, one `mint` RPC seals all messages into one block.
-- Launcher, new RPC and UI are **not started**.
+- The launcher, the `deliberationState` RPC and the UI exist in the working tree on `ceng-l-dqbx564`.
+- The fake LLM tests pass on 3 nodes. On 2026-11-06 the real model ran problem 1 (3 nodes, rounds 2, turns 2)
+  through the UI: 9 replies in 2 minutes, one block with the same hash on all nodes, all answers $5, no log errors.
+- `Mempool.pushMessage` now clears `_messagesByRounds` at init, so a second deliberation needs no restart.
+- The user removed problem 8 from the pool. Problems 6 and 9 stay out because the model fails on them.
 
 ### Test result (one run: 3 nodes, star layout)
 Problem: "If a/b=3/4 and 8a+5b=22 and a+c = 12 ,then find the value of c." Rounds "2", turns "1", which gives
@@ -43,15 +47,24 @@ Problem: "If a/b=3/4 and 8a+5b=22 and a+c = 12 ,then find the value of c." Round
   appeared while idle. No exceptions.
 - 5 of 6 replies stated the right answer (10.5 or 21/2). One said only that the answer "remains the same".
 
+## Running the demo
+```bash
+./demo start --nodes 3              # real model; needs about 41 GB of free GPU memory
+./demo start --nodes 3 --fake-llm   # no GPU; uses demo-ui/fake-llm.js on port 5000
+./demo restart-nodes                # keeps the chain
+./demo reset                        # deletes the chain and the block history
+./demo stop [--keep-llm]
+```
+The UI is on port 8700 and binds to 127.0.0.1. From the laptop, use `ssh -L 8700:127.0.0.1:8700 <user>@<host>`.
+Files: `demo`, `demo-ui/server.js`, `demo-ui/problems.json`, `demo-ui/public/`. Run data is in `.demo/`, which is
+gitignored. The block history keeps the problem text in `.demo/blocks.json`, keyed by block hash.
+
+To rebuild on `ceng-l-dqbx564`, use the system Python 3.10, because `node-gyp` needs `distutils`:
+`PYTHON=/usr/bin/python3 npm_config_python=/usr/bin/python3 yarn && yarn build`.
+
 ## Remaining work, in order
-1. **Launcher** (repo root): `./demo start --nodes N` and `./demo reset`. Creates per-node dirs and configs,
-   starts the LLM servers, waits for consensus. Use a star layout (mesh took about 60 s to start vs 2-8 s).
-2. **Read-only RPC** for deliberation state and transcript: round, current speaker, messages. Today this exists
-   only in logs. Add it in `clients/nodejs/modules/JsonRpcServer.js` and in `src/`.
-3. **UI:** problem pool from `clients/nodejs/ProbelmUsed.md`, Start, thinking state, live replies, Finalize via
-   `mint` once every node has all messages, block view with matching hashes. Reachable from the laptop over
-   SSH or VPN.
-4. **Rehearsal and recorded backup**, about days 11-14 (2026-11-15 to 2026-11-18).
+1. **More real model runs** on the other pool problems, to check answer extraction and header display.
+2. **Rehearsal and recorded backup**, about days 11-14 (2026-11-15 to 2026-11-18).
 
 UI requirements found during the test:
 - `startDeliberation` blocks until the first LLM reply, so call it in the background or with a long timeout.
@@ -59,11 +72,13 @@ UI requirements found during the test:
 - Nothing checks agreement between nodes, and the same answer appears as both `10.5` and `21/2`. Extract each
   final answer and show them side by side, marking unclear ones as unclear.
 
-## Decisions awaiting the user
-These were asked and not answered, and the paths below must be chosen for the new machine:
-1. Where to clone `LLM-Deliberation` (proposed `~/LLM-Deliberation`).
-2. Install flask and pynvml into the `deli` conda env, or into a separate env.
-3. OK to run `yarn` in this repo? It rebuilds `dist/node.js` from `src/`.
+## Decisions from the user
+- `LLM-Deliberation` is next to this repo, in `~/ap1923/LLM-Deliberation`, and the launcher uses the `deli` env.
+- The user operates the UI. The default is rounds "2" and turns "1", and the user can edit these and the problem.
+- A block seals automatically when every node reports `isEnd` and all `messageCount` values match and are stable.
+- The chain now stays between deliberations, and a Blocks view shows past blocks and their deliberations.
+  This replaces the reset between runs in the Goal section. `./demo reset` is still the full wipe.
+- The correct answer appears after sealing, and it does not appear for an edited problem.
 
 ## Setup on a new machine
 Needs: about 40 GB of GPU memory, about 132 GB of disk for the model cache as it stood here. The previous machine
@@ -109,7 +124,8 @@ Flow, all over JSON-RPC on one node after all nodes connect (bound to 127.0.0.1 
 2. `initDeliberation(nodeAddress, {problem, rounds:"2", turns:"1"})`. Wait until it reaches every node (log line
    "Init deli called"). Starting before that caused a `reading '0'` crash earlier.
 3. `startDeliberation` on the same node.
-4. Poll `messageCount` on all nodes until each reaches rounds x turns x nodes.
+4. Poll `messageCount` and `deliberationState` on all nodes until `isEnd` is true and the counts match. A fake LLM
+   test with 3 nodes, rounds "2" and turns "2" gave 9 messages.
 5. `mint` once. Check `getBlockByNumber` on each node. Messages are stored in `extraData` as hex of
    `"<pubkeyHex> : <text>\n"`.
 

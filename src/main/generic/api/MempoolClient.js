@@ -61,6 +61,12 @@ Client.Mempool = class Mempool {
         return messages.length;
     }
 
+    //  @UP
+    async getDeliberationState() {
+        const consensus = await this._client._consensus;
+        return consensus.getDeliberationState();
+    }
+
     /**
      * @param {MempoolListener} listener
      * @return {Promise<Handle>}

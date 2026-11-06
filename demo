@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+# Launcher for the deliberation demo. Usage is in the usage() function below.
+set -u
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUN="$ROOT/.demo"
+NODE_BIN="${DEMO_NODE:-$HOME/.nvm/versions/node/v20.19.0/bin/node}"
+PY="${DEMO_PYTHON:-$HOME/.conda/envs/deli/bin/python}"
+LLM_DIR="${DEMO_LLM_DIR:-$(dirname "$ROOT")/LLM-Deliberation}"
+MODEL_GPU_MIB=41000
+
+usage() {
+    cat <<USAGE
+Usage:
+  ./demo start --nodes N [--fake-llm] [--ui-host HOST] [--ui-port PORT]
+  ./demo reset            Delete the chain and block history, then restart nodes and UI.
+  ./demo restart-nodes    Restart the nodes and keep the chain.
+  ./demo stop [--keep-llm]
+USAGE
+}
+die() { echo "error: $*" >&2; exit 1; }
+say() { echo "[demo] $*"; }
+port_open() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+wait_port() { # port seconds pidfile-to-watch
+    local end=$((SECONDS + $2))
+    while ((SECONDS < end)); do
+        port_open "$1" && return 0
+        if [ -n "${3:-}" ] && ! pid_alive "$3"; then return 2; fi
+        sleep 0.5
+    done
+    return 1
+}
+pid_alive() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
+
+# Stops only the process in the PID file, and only if its command line still matches.
+stop_pid() { # pidfile pattern
+    [ -f "$1" ] || return 0
+    local pid; pid="$(cat "$1")"
+    if kill -0 "$pid" 2>/dev/null && tr '\0' ' ' <"/proc/$pid/cmdline" | grep -q -- "$2"; then
+        kill -9 "$pid" 2>/dev/null
+        while kill -0 "$pid" 2>/dev/null; do sleep 0.1; done
+    fi
+    rm -f "$1"
+}
+rpc() { # node method [json-params]
+    curl -s -m 5 "http://127.0.0.1:$((8600 + $1))" \
+        -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"$2\",\"params\":${3:-[]}}" |
+        "$NODE_BIN" -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const r=JSON.parse(s).result;console.log(r===undefined?"":r)}catch(e){}})'
+}
+save_state() {
+    printf 'NODES=%q\nFAKE=%q\nUI_HOST=%q\nUI_PORT=%q\n' "$NODES" "$FAKE" "$UI_HOST" "$UI_PORT" >"$RUN/state"
+}
+load_state() {
+    [ -f "$RUN/state" ] || die "no earlier start found. Run ./demo start --nodes N first."
+    # shellcheck disable=SC1091
+    . "$RUN/state"
+}
+spawn() { # pidfile logfile dir command...
+    local pidfile="$1" log="$2" dir="$3"; shift 3
+    (cd "$dir" && exec setsid nohup "$@" >>"$log" 2>&1 </dev/null) &
+    echo $! >"$pidfile"
+}
+
+start_llm() {
+    local mode=real; [ "$FAKE" = 1 ] && mode=fake
+    if [ -f "$RUN/llm.mode" ] && [ "$(cat "$RUN/llm.mode")" != "$mode" ]; then
+        stop_pid "$RUN/deli.pid" 'DefinitiveDeliberationServer\|fake-llm.js'
+    fi
+    if [ "$mode" = fake ]; then
+        if ! port_open 5000; then
+            say "starting the fake LLM on port 5000"
+            spawn "$RUN/deli.pid" "$RUN/deli.log" "$ROOT" "$NODE_BIN" demo-ui/fake-llm.js
+            wait_port 5000 10 "$RUN/deli.pid" || die "fake LLM did not start. See $RUN/deli.log."
+        fi
+        echo fake >"$RUN/llm.mode"
+        return
+    fi
+    [ -f "$LLM_DIR/Model/ModelServer.py" ] || die "LLM code not found at $LLM_DIR. Set DEMO_LLM_DIR."
+    [ -x "$PY" ] || die "Python not found at $PY. Set DEMO_PYTHON."
+    if ! port_open 5001; then
+        local free; free="$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null | sort -n | tail -1)"
+        if [ -n "$free" ] && [ "$free" -lt "$MODEL_GPU_MIB" ]; then
+            die "GPU has $free MiB free and the model needs about $MODEL_GPU_MIB MiB."
+        fi
+        say "loading the model on port 5001 (about 1 minute)"
+        HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 spawn "$RUN/model.pid" "$RUN/model.log" "$LLM_DIR/Model" "$PY" ModelServer.py
+        wait_port 5001 600 "$RUN/model.pid" || die "model server did not start. See $RUN/model.log."
+    fi
+    if ! port_open 5000; then
+        say "starting the deliberation server on port 5000"
+        spawn "$RUN/deli.pid" "$RUN/deli.log" "$LLM_DIR/Deliberation" "$PY" DefinitiveDeliberationServer.py
+        wait_port 5000 60 "$RUN/deli.pid" || die "deliberation server did not start. See $RUN/deli.log."
+    fi
+    echo real >"$RUN/llm.mode"
+}
+
+write_conf() { # node seed-peers-json
+    cat >"$RUN/n$1/node.conf" <<CONF
+{ host: "my.domain", port: $((8500 + $1)), protocol: "ws", network: "dev", type: "full",
+  rpcServer: { enabled: "yes", port: $((8600 + $1)) }, miner: { enabled: "no", threads: 1 }, log: { level: "info" },
+  constantOverrides: { "BaseConsensusAgent.TRANSACTION_RELAY_INTERVAL": 700 },
+  seedPeers: [ $2 ] }
+CONF
+}
+start_node() {
+    spawn "$RUN/n$1/node.pid" "$RUN/n$1/node.log" "$RUN/n$1" "$NODE_BIN" "$ROOT/clients/nodejs/index.js" --config=node.conf
+    wait_port $((8600 + $1)) 60 "$RUN/n$1/node.pid" || die "node $1 did not start. See $RUN/n$1/node.log."
+}
+stop_nodes() {
+    local d
+    for d in "$RUN"/n*/; do
+        [ -d "$d" ] && stop_pid "${d}node.pid" 'clients/nodejs/index.js'
+    done
+}
+start_nodes() {
+    local i key
+    for ((i = 1; i <= NODES; i++)); do
+        if port_open $((8500 + i)) || port_open $((8600 + i)); then
+            die "port $((8500 + i)) or $((8600 + i)) is in use by another process."
+        fi
+        mkdir -p "$RUN/n$i"
+    done
+    write_conf 1 ""
+    start_node 1
+    key="$(rpc 1 nodeAddress)"
+    [ -n "$key" ] || die "could not read the public key of node 1."
+    for ((i = 2; i <= NODES; i++)); do
+        write_conf "$i" "{host:'127.0.0.1',port:8501,publicKey:'$key',protocol:'ws'}"
+        start_node "$i"
+    done
+    say "waiting for consensus on $NODES nodes"
+    local end=$((SECONDS + 120)) ok
+    while ((SECONDS < end)); do
+        ok=1
+        for ((i = 1; i <= NODES; i++)); do
+            [ "$(rpc "$i" consensus)" = established ] || ok=0
+        done
+        [ "$(rpc 1 peerCount)" = $((NODES - 1)) ] || ok=0
+        if [ "$ok" = 1 ]; then say "consensus established"; return 0; fi
+        sleep 0.5
+    done
+    die "nodes did not reach consensus in 120 s. See $RUN/n*/node.log."
+}
+stop_ui() { stop_pid "$RUN/ui.pid" 'demo-ui/server.js'; }
+start_ui() {
+    port_open "$UI_PORT" && die "UI port $UI_PORT is in use by another process."
+    DEMO_NODES="$NODES" DEMO_RUN="$RUN" DEMO_ROOT="$ROOT" DEMO_UI_HOST="$UI_HOST" DEMO_UI_PORT="$UI_PORT" \
+        spawn "$RUN/ui.pid" "$RUN/ui.log" "$ROOT" "$NODE_BIN" demo-ui/server.js
+    wait_port "$UI_PORT" 10 "$RUN/ui.pid" || die "UI did not start. See $RUN/ui.log."
+    say "UI on this machine: http://$UI_HOST:$UI_PORT"
+    say "From the laptop: ssh -L $UI_PORT:127.0.0.1:$UI_PORT $(id -un)@$(hostname), then open http://localhost:$UI_PORT"
+}
+wipe_chain() {
+    rm -rf "$RUN"/n*/*-consensus "$RUN"/n*/node.log "$RUN/blocks.json"
+}
+
+cmd="${1:-}"; [ $# -gt 0 ] && shift
+"$NODE_BIN" -v 2>/dev/null | grep -qx 'v20.19.0' || die "Node 20.19.0 not found at $NODE_BIN. Set DEMO_NODE."
+case "$cmd" in
+start)
+    NODES=""; FAKE=0; UI_HOST=127.0.0.1; UI_PORT=8700
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --nodes) NODES="${2:-}"; shift 2 ;;
+            --fake-llm) FAKE=1; shift ;;
+            --ui-host) UI_HOST="${2:-}"; shift 2 ;;
+            --ui-port) UI_PORT="${2:-}"; shift 2 ;;
+            *) usage; exit 1 ;;
+        esac
+    done
+    case "$NODES" in 2|3|4) ;; *) die "--nodes must be 2, 3 or 4." ;; esac
+    [ -f "$ROOT/build/Release/nimiq_node_native.node" ] || die "build is missing. Run: PYTHON=/usr/bin/python3 npm_config_python=/usr/bin/python3 yarn && yarn build"
+    mkdir -p "$RUN"
+    for d in "$RUN"/n*/; do
+        [ -f "${d}node.pid" ] && pid_alive "${d}node.pid" && die "nodes are already running. Run ./demo stop first."
+    done
+    if [ -f "$RUN/state" ]; then
+        old="$(. "$RUN/state"; echo "$NODES")"
+        if [ "$old" != "$NODES" ]; then
+            say "node count changed from $old to $NODES, so the chain is deleted"
+            rm -rf "$RUN"/n* "$RUN/blocks.json"
+        fi
+    fi
+    save_state
+    start_llm
+    start_nodes
+    start_ui
+    ;;
+reset)
+    load_state; mkdir -p "$RUN"
+    stop_ui; stop_nodes; wipe_chain
+    start_llm; start_nodes; start_ui
+    ;;
+restart-nodes)
+    load_state
+    stop_nodes; start_nodes
+    ;;
+stop)
+    [ -d "$RUN" ] || exit 0
+    stop_ui; stop_nodes
+    if [ "${1:-}" != --keep-llm ]; then
+        stop_pid "$RUN/deli.pid" 'DefinitiveDeliberationServer\|fake-llm.js'
+        stop_pid "$RUN/model.pid" 'ModelServer.py'
+        rm -f "$RUN/llm.mode"
+    fi
+    say "stopped"
+    ;;
+*) usage; exit 1 ;;
+esac

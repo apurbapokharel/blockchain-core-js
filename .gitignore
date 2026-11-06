@@ -38,3 +38,4 @@ packaging/npm/*
 !packaging/npm/README.md
 package-lock.json
 yarn.lock
+.demo/

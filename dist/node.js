@@ -19834,6 +19834,33 @@ class Mempool extends Observable {
         return [this._messagesByRounds.get(key1), this._messagesByRounds.get(key2)];
     }
 
+    //@UP: Read-only view of the deliberation for the demo UI
+    getDeliberationState() {
+        const d = this._deliberation;
+        // Before the first init, a deliberation has no participants.
+        const participants = d.participants || [];
+        const replies = [];
+        for (const [key, text] of this._messagesByRounds.entryIterator()) {
+            const [round, turn, speakerIndex] = key.split(',').map(Number);
+            replies.push({round, turn, speakerIndex, text});
+        }
+        return {
+            problem: d.problem === undefined ? null : d.problem,
+            totalRound: d.totalRound === undefined ? null : Number(d.totalRound),
+            totalTurn: d.totalTurn === undefined ? null : Number(d.totalTurn),
+            participants,
+            currentRound: d.currentRound,
+            currentTurn: d.currentTurn,
+            speakerIndex: d.speakerIndex,
+            currentSpeaker: participants[d.speakerIndex] || null,
+            isEnd: d.isEnd,
+            startTime: d.startTime,
+            endTime: d.endTime,
+            roundTime: d.roundTime,
+            replies
+        };
+    }
+
     //@UP: for testing only
     async seeMapping(){
         function formatDuration(timeA, timeB) {
@@ -19938,6 +19965,8 @@ class Mempool extends Observable {
         if(message instanceof DeliberationInit){
             if (this._deliberation.problem === undefined || this._deliberation.isEnd){
                 console.log("Init deli called");
+                // Replies from the previous deliberation must not reach the next one.
+                this._messagesByRounds = new HashMap();
                 this._deliberation = new Deliberation(message._decodedProblem, message._rounds, message._turns, message._participants, false);
                 const response = await axios.post(`http://127.0.0.1:5000/init`, {
                     params: {
@@ -25730,6 +25759,10 @@ class FullConsensus extends BaseConsensus {
         //TODO: handle the mempool code switch case
     }
     
+    getDeliberationState(){
+        return this._mempool.getDeliberationState();
+    }
+
     async seeMapping(){
         await this._mempool.seeMapping();
     }
@@ -44225,6 +44258,12 @@ Client.Mempool = class Mempool {
         const consensus = await this._client._consensus;
         const messages = consensus.getMempoolMessages();
         return messages.length;
+    }
+
+    //  @UP
+    async getDeliberationState() {
+        const consensus = await this._client._consensus;
+        return consensus.getDeliberationState();
     }
 
     /**

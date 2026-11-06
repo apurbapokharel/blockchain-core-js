@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deliberation Chain</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">Deliberation Chain</div>
+  <nav>
+    <button class="tab" data-view="run" aria-pressed="true">Deliberation</button>
+    <button class="tab" data-view="chain" aria-pressed="false">Blocks</button>
+  </nav>
+  <div id="network" class="network"></div>
+</header>
+
+<main>
+  <div id="banner" class="banner" hidden></div>
+
+  <section id="view-run">
+    <section id="stage-pick" hidden>
+      <div class="pick">
+        <div>
+          <h2>Choose a problem</h2>
+          <div id="pool" class="pool"></div>
+        </div>
+        <form id="editor" class="editor">
+          <label for="problem">Problem</label>
+          <textarea id="problem" rows="9" required></textarea>
+          <div class="fields">
+            <label>Rounds <input id="rounds" type="number" min="1" max="5" value="2" required></label>
+            <label>Turns <input id="turns" type="number" min="1" max="5" value="1" required></label>
+          </div>
+          <button id="start" class="primary" type="submit">Start deliberation</button>
+          <p id="start-note" class="note"></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="stage-live" hidden>
+      <div class="problem-bar">
+        <div id="live-problem" class="problem-text"></div>
+        <div id="progress" class="progress-text"></div>
+        <div class="bar"><div id="bar-fill"></div></div>
+      </div>
+      <div id="seal" class="seal" hidden></div>
+      <div id="cards" class="cards"></div>
+      <h2 id="transcript-title">Transcript</h2>
+      <div id="transcript" class="transcript"></div>
+    </section>
+  </section>
+
+  <section id="view-chain" hidden>
+    <h2>Sealed blocks</h2>
+    <p id="chain-empty" class="note" hidden>No block is sealed yet. Run a deliberation first.</p>
+    <div id="chain" class="chain"></div>
+    <div id="block-detail" class="block-detail"></div>
+  </section>
+</main>
+<script src="vendor/katex/katex.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -110,6 +110,7 @@ class JsonRpcServer {
         this._methods.set('mempoolContent', this.mempoolContent.bind(this));
         this._methods.set('mempool', this.mempool.bind(this));
         this._methods.set('messageCount', this.messageCount.bind(this));
+        this._methods.set('deliberationState', this.deliberationState.bind(this));
         this._methods.set('minFeePerByte', this.minFeePerByte.bind(this));
 
         // Miner
@@ -410,6 +411,10 @@ class JsonRpcServer {
         const transactionsPerBucket = stats.countInBuckets;
         transactionsPerBucket.total = stats.count;
         return transactionsPerBucket;
+    }
+
+    async deliberationState(){
+        return this._client.mempool.getDeliberationState();
     }
 
     async messageCount(){

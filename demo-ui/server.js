@@ -28,6 +28,7 @@ async function rpc(node, method, params = [], timeoutMs = 4000) {
     return data.result;
 }
 
+const llmMode = () => { try { return fs.readFileSync(path.join(RUN, 'llm.mode'), 'utf8').trim(); } catch (e) { return null; } };
 const readSidecar = () => { try { return JSON.parse(fs.readFileSync(SIDECAR)); } catch (e) { return {}; } };
 function writeSidecar(hash, entry) {
     const all = readSidecar();
@@ -125,8 +126,9 @@ function setError(message) {
 async function tick() {
     nodes = await Promise.all(NODE_IDS.map(pollNode));
     if (run.phase !== 'running') return;
-    const count = transcript().length;
-    if (count !== run.replyCount) { run.replyCount = count; run.lastReplyAt = Date.now(); }
+    const live = transcript();
+    for (const m of live) if (!(m.key in run.seen)) run.seen[m.key] = Date.now();
+    if (live.length !== run.replyCount) { run.replyCount = live.length; run.lastReplyAt = Date.now(); }
     const down = nodes.find(n => !n.up);
     if (down) return setError(`Node ${down.index} stopped responding.`);
     const ended = nodes.every(n => n.state.isEnd && n.state.problem === run.problem);
@@ -156,6 +158,9 @@ async function seal() {
         const entry = {
             problem: run.problem, rounds: run.rounds, turns: run.turns, known: run.known,
             startedAt: run.startedAt, finishedAt: run.finishedAt,
+            // For replays: which LLM wrote the replies, and when each reply arrived (ms after the start).
+            llm: llmMode(),
+            replyTimes: finalMessages.map(m => run.seen[m.key] - run.startedAt).sort((a, b) => a - b),
         };
         writeSidecar(blocks[0].hash, entry);
         run.transcript = finalMessages;
@@ -206,6 +211,7 @@ async function describeBlock(number) {
         number: b.number, hash: b.hash, parentHash: b.parentHash, timestamp: b.timestamp, size: b.size,
         problem: entry ? entry.problem : null, rounds: entry ? entry.rounds : null, turns: entry ? entry.turns : null,
         known: entry ? entry.known : null, startedAt: entry ? entry.startedAt : null, finishedAt: entry ? entry.finishedAt : null,
+        llm: entry ? entry.llm || null : null, replyTimes: entry ? entry.replyTimes || null : null,
         hashes, allMatch: hashes.every(h => h.hash === b.hash),
         messages, answers: answersFor(messages, entry && entry.known),
         extraDataBytes: b.extraData ? b.extraData.length / 2 : 0,
@@ -220,7 +226,7 @@ async function listBlocks() {
         out.push({
             number: b.number, hash: b.hash, timestamp: b.timestamp, size: b.size,
             messageCount: decodeMessages(b.extraData, null).length,
-            problem: entry ? entry.problem : null,
+            problem: entry ? entry.problem : null, llm: entry ? entry.llm || null : null,
         });
     }
     return out;
@@ -230,7 +236,7 @@ async function listBlocks() {
 async function beginRun(problem, rounds, turns) {
     const known = POOL.find(p => p.problem === problem) || null;
     run = {
-        phase: 'starting', problem, rounds, turns, startedAt: Date.now(), lastReplyAt: Date.now(), replyCount: 0,
+        phase: 'starting', problem, rounds, turns, startedAt: Date.now(), lastReplyAt: Date.now(), replyCount: 0, seen: {},
         known: known ? {answer: known.answer, value: known.value, tolerance: known.tolerance} : null,
     };
     stableTicks = 0;

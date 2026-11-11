@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Video scenes</title>
+<!-- Draws every scene of the 60 s video except the demo. video/build.js calls render(t) for each frame. -->
+<style>
+  :root { --bg: #C5D99B; --panel: #EEF4E0; --green: #22802D; --olive: #6E8A35; --dark: #1C3A21; --ink: #1B2220;
+          --muted: #4A5650; --n1: #1F6FB2; --n2: #B4531F; --n3: #6B4BB5; --warn: #A8432A; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--dark);
+               font-family: Arial, "Liberation Sans", Helvetica, sans-serif; color: var(--ink); }
+  .scene { position: absolute; inset: 0; opacity: 0; }
+  .center { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .fill { position: absolute; inset: 0; }
+  .icon svg { width: 100%; height: 100%; }
+
+  /* Scene 1: hook */
+  #s1 { background: var(--dark); color: #fff; }
+  #s1 .l1 { font-size: 84px; font-weight: 700; }
+  #s1 .l2 { font-size: 100px; font-weight: 700; color: var(--bg); margin-top: 48px; }
+  .chain { position: absolute; left: 0; bottom: 120px; height: 120px; white-space: nowrap; }
+  .chain .b { display: inline-block; width: 150px; height: 110px; border-radius: 14px; border: 4px solid #4F7A3A;
+              vertical-align: middle; }
+  .chain .ln { display: inline-block; width: 70px; height: 4px; background: #4F7A3A; vertical-align: middle; }
+
+  /* Scene 2: today's consensus */
+  #s2 { background: var(--panel); }
+  h1.t { position: absolute; top: 110px; width: 100%; text-align: center; font-size: 76px; color: var(--dark); }
+  .cards3 { position: absolute; top: 300px; left: 160px; right: 160px; display: flex; gap: 60px; }
+  .c3 { flex: 1; background: #fff; border-radius: 28px; padding: 50px 40px; text-align: center; border: 3px solid #C9D8B0; }
+  .c3 .ic { width: 150px; height: 150px; border-radius: 50%; background: var(--olive); margin: 0 auto 34px; padding: 36px; }
+  .c3 .h { font-size: 52px; font-weight: 700; }
+  .c3 .s { font-size: 38px; color: var(--muted); margin-top: 18px; line-height: 1.3; }
+  #s2 .verdict { position: absolute; top: 830px; width: 100%; text-align: center; font-size: 60px; font-weight: 700; color: var(--warn); }
+
+  /* Scene 3: the idea */
+  #s3 { background: var(--panel); }
+  .agent { position: absolute; width: 210px; height: 210px; border-radius: 50%; padding: 52px; }
+  .agent .lbl { position: absolute; width: 300px; left: -45px; top: 222px; text-align: center; font-size: 40px; font-weight: 700; }
+  .agent .dots { position: absolute; left: 0; right: 0; top: -58px; text-align: center; }
+  .agent .dots i { display: inline-block; width: 22px; height: 22px; border-radius: 50%; margin: 0 6px; background: currentColor; }
+  .reply { position: absolute; width: 130px; height: 80px; border-radius: 16px; }
+  .block { position: absolute; left: 1230px; top: 300px; width: 470px; height: 560px; border-radius: 30px; padding: 34px; }
+  .block .bt { font-size: 46px; font-weight: 700; text-align: center; }
+  .block .bsub { font-size: 32px; text-align: center; margin-top: 8px; opacity: .8; }
+  .block .bars { margin-top: 26px; }
+  .block .bar { height: 30px; border-radius: 8px; margin-bottom: 14px; }
+  .chip { position: absolute; height: 84px; border-radius: 16px; background: #fff;
+          font-size: 34px; display: flex; align-items: center; justify-content: center; gap: 22px; border: 5px solid; }
+  .chip b { font-family: Arial, sans-serif; }
+  .chip span { font-family: "Courier New", "Liberation Mono", monospace; color: var(--ink); }
+
+  /* Scene 5: closing */
+  #s5 { background: var(--green); color: #fff; }
+  #s5 .title { font-size: 70px; font-weight: 700; line-height: 1.2; }
+  #s5 .names { font-size: 52px; font-weight: 700; margin-top: 60px; }
+  #s5 .aff { font-size: 44px; color: #E3EED0; margin-top: 20px; }
+  #s5 .cta { font-size: 64px; font-weight: 700; color: var(--bg); margin-top: 90px; }
+  #fade { position: absolute; inset: 0; background: var(--dark); opacity: 0; }
+
+  /* Captions */
+  #cap { position: absolute; left: 0; right: 0; bottom: 56px; text-align: center; }
+  #cap span { display: inline-block; max-width: 1640px; background: rgba(0, 0, 0, .78); color: #fff; font-size: 50px;
+              line-height: 1.3; padding: 16px 34px; border-radius: 14px; }
+</style>
+</head>
+<body>
+<section class="scene center" id="s1">
+  <div class="l1">Blockchains are good at agreeing on data.</div>
+  <div class="l2">But who agrees on decisions?</div>
+  <div class="chain" id="chain1"></div>
+</section>
+
+<section class="scene" id="s2">
+  <h1 class="t">How blockchains agree today</h1>
+  <div class="cards3">
+    <div class="c3" id="c3a"><div class="ic icon" data-icon="FaCheckToSlot"></div><div class="h">Majority vote</div><div class="s">The minority is overruled</div></div>
+    <div class="c3" id="c3b"><div class="ic icon" data-icon="FaBolt"></div><div class="h">Leader election</div><div class="s">Work or stake picks a winner</div></div>
+    <div class="c3" id="c3c"><div class="ic icon" data-icon="FaGaugeHigh"></div><div class="h">Built for speed</div><div class="s">Fast, not thoughtful</div></div>
+  </div>
+  <div class="verdict" id="verdict">Agreement, but no reasoning</div>
+</section>
+
+<section class="scene" id="s3">
+  <h1 class="t" style="top:80px">AI agents deliberate, one turn at a time</h1>
+  <svg class="fill" viewBox="0 0 1920 1080" id="ring"></svg>
+  <div id="agents"></div>
+  <div id="replies"></div>
+  <div class="block" id="block"><div class="icon" id="cube" data-icon="FaCube" style="width:90px;height:90px;margin:0 auto 14px"></div>
+    <div class="bt" id="btitle">Next block</div><div class="bsub" id="bsub"></div><div class="bars" id="bars"></div></div>
+  <div id="chips"></div>
+</section>
+
+<section class="scene center" id="s5">
+  <div class="title">Achieving Unanimous Consensus in Blockchain<br>with Multi-Agent Deliberation</div>
+  <div class="names">Apurba Pokharel and Ram Dantu</div>
+  <div class="aff">Network Security Labs, University of North Texas</div>
+  <div class="cta" id="cta">Ask us for a live demo.</div>
+</section>
+<div id="fade"></div>
+<div id="cap"></div>
+
+<script>
+// Scene times in seconds. The demo (30 to 50 s) is recorded from the UI, so this page is blank there.
+const SCENES = [['s1', 0, 8], ['s2', 8, 18], ['s3', 18, 30], ['s5', 50, 60]];
+const CAPTIONS = [
+  [8, 13, 'Today, blockchains agree by counting votes or picking a leader.'],
+  [13, 18, 'Nobody reasons, and the minority is simply overruled.'],
+  [18, 24, 'We let AI agents deliberate instead.'],
+  [24, 30, 'Each agent runs on its own node, reads the others, and answers in turn.'],
+  [50, 55, 'Unanimous consensus, with every argument on record.'],
+];
+const NODE = ['var(--n1)', 'var(--n2)', 'var(--n3)'];
+const AG = [[560, 340], [790, 670], [330, 670]]; // agent centers
+const BLOCK = [1465, 560];
+const TURN0 = 19.0, TURN = 1.25, TURNS = 6, SEAL = 27.0;
+
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ease = x => { x = clamp(x); return x * x * (3 - 2 * x); };
+const ramp = (t, a, b) => ease((t - a) / (b - a));
+const $ = id => document.getElementById(id);
+
+function setup(icons) {
+  document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = icons[el.dataset.icon].replace(/currentColor/g, '#fff'); });
+  $('cube').innerHTML = icons.FaCube;
+  let c = '';
+  for (let i = 0; i < 14; i++) c += (i ? '<span class="ln"></span>' : '') + '<span class="b"></span>';
+  $('chain1').innerHTML = c;
+  // Agent ring: arrows between the agents.
+  let svg = '<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0L10,5L0,10z" fill="#1C3A21"/></marker></defs>';
+  for (let i = 0; i < 3; i++) {
+    const [ax, ay] = AG[i], [bx, by] = AG[(i + 1) % 3], dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy), k = 135 / L;
+    svg += `<line x1="${ax + dx * k}" y1="${ay + dy * k}" x2="${bx - dx * k}" y2="${by - dy * k}" stroke="#1C3A21" stroke-width="9" marker-end="url(#ah)"/>`;
+  }
+  $('ring').innerHTML = svg;
+  $('agents').innerHTML = AG.map(([x, y], i) => `<div class="agent icon" id="ag${i}" style="left:${x - 105}px;top:${y - 105}px;background:${NODE[i]};color:${NODE[i]}">
+    ${icons.FaRobot.replace(/currentColor/g, '#fff')}<div class="dots" id="dots${i}"><i></i><i></i><i></i></div>
+    <div class="lbl" ${i === 0 ? 'style="left:-330px;top:80px;text-align:right"' : ''}>AI agent ${i + 1}</div></div>`).join('');
+  $('replies').innerHTML = Array.from({length: TURNS}, (_, k) => `<div class="reply" id="r${k}" style="background:${NODE[k % 3]}"></div>`).join('');
+  $('bars').innerHTML = Array.from({length: TURNS}, (_, k) => `<div class="bar" id="bar${k}" style="background:${NODE[k % 3]}"></div>`).join('');
+  $('chips').innerHTML = [0, 1, 2].map(i => `<div class="chip" id="chip${i}" style="border-color:${NODE[i]}">
+    <b style="color:${NODE[i]}">Node ${i + 1}</b><span>#85b3…313a</span></div>`).join('');
+}
+
+function render(t) {
+  // Scene opacity with 0.5 s cross-fades.
+  for (const [id, a, b] of SCENES) {
+    const fadeIn = a === 0 ? 1 : ramp(t, a - 0.25, a + 0.25);
+    $(id).style.opacity = Math.min(fadeIn, 1 - ramp(t, b - 0.25, b + 0.25));
+  }
+  // The last half second fades to the first scene's color, so the loop joins without a jump.
+  $('fade').style.opacity = ramp(t, 59.4, 59.95);
+
+  // Scene 1
+  $('s1').querySelector('.l1').style.opacity = ramp(t, 0.2, 0.9);
+  $('s1').querySelector('.l2').style.opacity = ramp(t, 3.2, 3.9);
+  $('chain1').style.transform = `translateX(${-60 * t}px)`;
+  $('chain1').style.opacity = 0.9;
+
+  // Scene 2
+  ['c3a', 'c3b', 'c3c'].forEach((id, i) => {
+    const p = ramp(t, 8.6 + i * 1.0, 9.2 + i * 1.0);
+    $(id).style.opacity = p; $(id).style.transform = `translateY(${(1 - p) * 60}px)`;
+  });
+  $('verdict').style.opacity = ramp(t, 13.2, 13.9);
+
+  // Scene 3: turns around the ring, replies fly into the block, then the block seals.
+  for (let i = 0; i < 3; i++) {
+    const k = Math.floor((t - TURN0) / TURN);
+    const active = t >= TURN0 && k < TURNS && k % 3 === i;
+    const ag = $('ag' + i);
+    ag.style.boxShadow = active ? `0 0 0 16px rgba(255,255,255,.9), 0 0 0 26px ${['#1F6FB2', '#B4531F', '#6B4BB5'][i]}` : 'none';
+    ag.style.opacity = ramp(t, 18.3 + i * 0.25, 18.8 + i * 0.25);
+    const dots = $('dots' + i).children;
+    for (let d = 0; d < 3; d++) dots[d].style.opacity = active ? 0.3 + 0.7 * ((Math.floor(t * 4) + 3 - d) % 3 === 0 ? 1 : 0) : 0;
+  }
+  let landed = 0;
+  for (let k = 0; k < TURNS; k++) {
+    const start = TURN0 + (k + 1) * TURN - 0.6, p = ramp(t, start, start + 0.6);
+    const [ax, ay] = AG[k % 3], x = ax + (BLOCK[0] - ax) * p, y = ay + (BLOCK[1] - ay) * p;
+    const r = $('r' + k);
+    r.style.left = `${x - 65}px`; r.style.top = `${y - 40}px`;
+    r.style.opacity = t >= start && p < 1 ? 1 : 0;
+    if (p >= 1) landed++;
+    $('bar' + k).style.opacity = p >= 1 ? 1 : 0;
+  }
+  const sealed = ramp(t, SEAL, SEAL + 0.5);
+  const blk = $('block');
+  blk.style.background = sealed > 0.5 ? 'var(--dark)' : '#fff';
+  blk.style.border = sealed > 0.5 ? '6px solid var(--dark)' : '6px dashed var(--dark)';
+  blk.style.color = sealed > 0.5 ? '#fff' : 'var(--dark)';
+  $('cube').style.color = sealed > 0.5 ? '#E3EED0' : 'var(--dark)';
+  $('btitle').textContent = sealed > 0.5 ? 'Sealed block' : 'Next block';
+  $('bsub').textContent = sealed > 0.5 ? `${TURNS} replies` : `${landed} of ${TURNS} replies`;
+  // After the seal the block moves left, and one hash chip per node appears at its right.
+  blk.style.left = `${1230 - ramp(t, SEAL + 0.2, SEAL + 0.8) * 300}px`;
+  for (let i = 0; i < 3; i++) {
+    const p = ramp(t, SEAL + 0.6 + i * 0.35, SEAL + 1.0 + i * 0.35);
+    const chip = $('chip' + i);
+    chip.style.opacity = p;
+    chip.style.left = '1440px';
+    chip.style.width = '440px';
+    chip.style.top = `${430 + i * 104 + (1 - p) * 30}px`;
+  }
+
+  // Scene 5
+  $('cta').style.opacity = ramp(t, 53.0, 53.7);
+
+  // Captions
+  const cap = CAPTIONS.find(([a, b]) => t >= a && t < b);
+  $('cap').innerHTML = cap ? `<span>${cap[2]}</span>` : '';
+  $('cap').style.opacity = cap ? Math.min(ramp(t, cap[0], cap[0] + 0.2), 1 - ramp(t, cap[1] - 0.2, cap[1])) : 0;
+}
+</script>
+</body>
+</html>

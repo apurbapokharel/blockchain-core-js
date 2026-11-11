@@ -21,6 +21,9 @@ nav { display: flex; gap: .3rem; }
 main { max-width: 1320px; margin: 0 auto; padding: 1rem 1.5rem 3rem; }
 .banner { padding: .8rem 1rem; border-radius: 8px; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; background: var(--warn-bg); color: var(--warn); }
 .banner.bad { background: var(--bad-bg); color: var(--bad); }
+.banner.replay { background: var(--ok-bg); color: var(--ok); position: sticky; top: 0; z-index: 5; box-shadow: 0 0 0 .5rem var(--bg); }
+.replay-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.replay-actions .note { margin: 0; }
 .note { color: var(--muted); font-size: .85rem; min-height: 1.3em; margin: .5rem 0 0; }
 .primary, .secondary { border-radius: 8px; padding: .6rem 1.2rem; font-weight: 600; border: 1px solid var(--accent); }
 .primary { background: var(--accent); color: var(--accent-ink); }
@@ -46,7 +49,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 1rem 1.5rem 3rem; }
 .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
 
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .8rem; margin-top: 1rem; }
-.cards.sticky { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: .5rem 0; }
+.cards.sticky { position: sticky; top: var(--banner-h, 0px); z-index: 2; background: var(--bg); padding: .5rem 0; }
 .card { background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--c); border-radius: 10px; padding: .7rem .9rem; }
 .card.speaking { box-shadow: 0 0 0 2px var(--c); }
 .card .name { font-weight: 700; color: var(--c); }

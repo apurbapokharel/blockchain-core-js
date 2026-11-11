@@ -14,6 +14,7 @@ Usage:
   ./demo start --nodes N [--fake-llm] [--ui-host HOST] [--ui-port PORT]
   ./demo reset            Delete the chain and block history, then restart nodes and UI.
   ./demo restart-nodes    Restart the nodes and keep the chain.
+  ./demo restart-ui       Restart only the UI server, for example after a UI change.
   ./demo stop [--keep-llm]
 USAGE
 }
@@ -193,6 +194,10 @@ reset)
 restart-nodes)
     load_state
     stop_nodes; start_nodes
+    ;;
+restart-ui)
+    load_state
+    stop_ui; start_ui
     ;;
 stop)
     [ -d "$RUN" ] || exit 0

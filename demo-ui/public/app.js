@@ -123,6 +123,7 @@ $('problem').addEventListener('input', () => {
 });
 $('editor').addEventListener('submit', async e => {
     e.preventDefault();
+    stopReplay();
     $('start').disabled = true;
     try {
         await api('start', {problem: $('problem').value, rounds: Number($('rounds').value), turns: Number($('turns').value)});
@@ -204,12 +205,13 @@ function drawSeal(s) {
     box.innerHTML = `<p class="verdict">${b.allMatch ? `All ${b.hashes.length} nodes hold the same block` : 'The nodes hold different blocks'}</p>
         <div class="seal-sub">Block ${b.number} · ${b.messages.length} messages · ${b.size} bytes</div>
         ${hashRows(b)}${answersHtml(b)}
-        <div class="seal-foot"><span class="note">Every reply in the transcript is now stored in this block.</span>
-        <button class="primary" id="new-run">New deliberation</button></div>`;
+        <div class="seal-foot"><span class="note">Every reply in the transcript is ${s.replay ? '' : 'now '}stored in this block.</span>
+        ${s.replay ? '<button class="secondary" id="stop-replay">Stop replay</button>' : '<button class="primary" id="new-run">New deliberation</button>'}</div>`;
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 $('seal').addEventListener('click', e => {
     if (e.target.id === 'new-run') api('new', {}).then(() => { $('problem').focus(); poll(); });
+    if (e.target.id === 'stop-replay') stopReplay();
 });
 function drawTranscript(s) {
     const key = s.transcript.map(m => m.key).join('|');
@@ -265,7 +267,10 @@ $('chain').addEventListener('click', async e => {
     selectedBlock = Number(t.dataset.n);
     document.querySelectorAll('.tile').forEach(x => x.setAttribute('aria-pressed', x === t));
     const b = await api(`blocks/${selectedBlock}`);
-    $('block-detail').innerHTML = `<div class="seal ${b.allMatch ? 'match' : 'mismatch'}">
+    const actions = b.messages.length ? `<div class="replay-actions">
+        <button class="primary" data-replay="${b.number}">Replay this deliberation</button>
+        <span class="note">${esc(sourceText(b.llm))}</span></div>` : '';
+    $('block-detail').innerHTML = `${actions}<div class="seal ${b.allMatch ? 'match' : 'mismatch'}">
         <p class="verdict">${b.allMatch ? `Block ${b.number}: all ${b.hashes.length} nodes match` : `Block ${b.number}: nodes differ`}</p>
         <div class="seal-sub">${b.messages.length} messages · ${b.size} bytes · ${new Date(b.timestamp * 1000).toLocaleString()}</div>
         ${b.problem ? `<div class="problem-text">${inlineMath(b.problem)}</div>` : '<p class="note">The problem text for this block is not on record.</p>'}
@@ -275,27 +280,135 @@ $('chain').addEventListener('click', async e => {
         <h2>Deliberation stored in this block</h2>${transcriptHtml(b.messages)}`;
 });
 
+$('block-detail').addEventListener('click', e => {
+    const n = e.target.dataset && e.target.dataset.replay;
+    if (n) startReplay([Number(n)], false);
+});
+
+/* ---------- replay of stored blocks ---------- */
+// A replay plays a sealed block as if it were live. It runs only in this page, changes nothing on the
+// nodes, and keeps a banner on screen that says it is a recording.
+let replay = null;
+let lastServer = null;
+const sourceText = llm => llm === 'real' ? 'Recorded from a real AI run.'
+    : llm === 'fake' ? 'Recorded from a test run with the stand-in LLM.' : 'Recorded run.';
+
+function planFor(b) {
+    const n = b.messages.length;
+    const recorded = b.replyTimes && b.replyTimes.length === n ? b.replyTimes : null;
+    const times = [];
+    let t = 2500;
+    for (let i = 0; i < n; i++) {
+        // Recorded gaps are kept between 2 and 12 seconds. Without a record, longer replies think longer.
+        const gap = recorded ? recorded[i] - (i ? recorded[i - 1] : 0) : 2500 + Math.min(6000, b.messages[i].text.length * 3);
+        t += Math.min(12000, Math.max(2000, gap));
+        times.push(t);
+    }
+    const sealingAt = t + 1500, sealedAt = sealingAt + 2500;
+    return {startMs: 2500, times, sealingAt, sealedAt, endAt: sealedAt + 15000};
+}
+function beginReplayBlock() {
+    replay.block = replay.blocks[replay.index];
+    replay.plan = planFor(replay.block);
+    replay.t0 = Date.now();
+    rendered.sealKey = null;
+    rendered.transcriptKey = null;
+}
+async function startReplay(numbers, loop) {
+    const blocks = [];
+    for (const n of numbers) {
+        try { const b = await api(`blocks/${n}`); if (b && b.messages.length) blocks.push(b); } catch (e) { /* skip */ }
+    }
+    if (!blocks.length) return;
+    replay = {blocks, index: 0, loop};
+    beginReplayBlock();
+    showView('run');
+    poll();
+}
+function stopReplay() {
+    if (!replay) return;
+    replay = null;
+    rendered.sealKey = null;
+    rendered.transcriptKey = null;
+    $('banner').hidden = true;
+    $('banner').dataset.text = '';
+    document.documentElement.style.removeProperty('--banner-h');
+    poll();
+}
+function replayState(server) {
+    const {block: b, plan} = replay;
+    let t = Date.now() - replay.t0;
+    if (t >= plan.endAt && replay.loop) {
+        replay.index = (replay.index + 1) % replay.blocks.length;
+        beginReplayBlock();
+        t = 0;
+    }
+    const shown = plan.times.filter(x => x <= t).length;
+    const phase = t < plan.startMs ? 'starting' : shown < b.messages.length ? 'running' : t < plan.sealedAt ? 'sealing' : 'sealed';
+    const next = b.messages[shown];
+    const sealed = phase === 'sealed';
+    return {
+        replay: true, now: Date.now(), phase, error: null, problem: b.problem || 'Recorded deliberation',
+        expected: b.messages.length, stalled: false,
+        // Once sealed, the times are those of the recorded run, not of the replay.
+        startedAt: sealed && b.startedAt ? b.startedAt : replay.t0,
+        finishedAt: sealed && b.finishedAt ? b.finishedAt : replay.t0 + plan.sealingAt,
+        lastReplyAt: replay.t0 + (shown ? plan.times[shown - 1] : plan.startMs),
+        speakingNode: phase === 'running' ? next.node : null,
+        currentRound: phase === 'running' ? next.round : null, currentTurn: phase === 'running' ? next.turn : null,
+        transcript: phase === 'starting' ? [] : b.messages.slice(0, shown),
+        block: sealed ? b : null,
+        nodes: (server ? server.nodes : []).map(n => ({...n, held: phase === 'starting' ? 0 : shown})),
+    };
+}
+function drawReplayBanner() {
+    const b = $('banner');
+    const blk = replay.block;
+    const text = `Replay of block ${blk.number}, sealed ${new Date(blk.timestamp * 1000).toLocaleString()}. ${sourceText(blk.llm)}`
+        + (replay.loop ? ` Looping through ${replay.blocks.length} recorded run${replay.blocks.length > 1 ? 's' : ''}.` : '');
+    b.hidden = false;
+    b.className = 'banner replay';
+    if (b.dataset.text !== text) {
+        b.dataset.text = text;
+        b.innerHTML = `<span>${esc(text)}</span><button class="secondary" id="stop-replay">Stop replay</button>`;
+    }
+    // The sticky node cards sit just under the sticky replay banner.
+    document.documentElement.style.setProperty('--banner-h', `${b.offsetHeight + 8}px`);
+}
+$('banner').addEventListener('click', e => { if (e.target.id === 'stop-replay') stopReplay(); });
+$('replay-loop').addEventListener('click', async () => {
+    let blocks = [];
+    try { blocks = await api('blocks'); } catch (e) { /* none */ }
+    const real = blocks.filter(b => b.llm === 'real').map(b => b.number).sort((a, b) => a - b);
+    if (!real.length) { $('start-note').textContent = 'No block from a real AI run is stored yet.'; return; }
+    startReplay(real, true);
+});
+
 /* ---------- loop ---------- */
 let view = 'run';
-document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
-    view = t.dataset.view;
-    document.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-pressed', x === t));
+function showView(v) {
+    view = v;
+    document.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-pressed', x.dataset.view === v));
     $('view-run').hidden = view !== 'run';
     $('view-chain').hidden = view !== 'chain';
     if (view === 'chain') loadChain();
-}));
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => showView(t.dataset.view)));
 let polling = false;
 async function poll() {
     if (polling) return;
     polling = true;
     try {
         const s = await api('state');
+        lastServer = s;
         drawNetwork(s);
-        drawBanner(s);
-        if (view === 'run') drawRun(s);
+        if (replay) drawReplayBanner(); else drawBanner(s);
+        if (view === 'run') drawRun(replay ? replayState(s) : s);
         else loadChain();
     } catch (e) {
         $('network').innerHTML = '<span class="notgood">UI server not reachable</span>';
+        // A replay keeps playing from the last known node list.
+        if (replay && view === 'run') { drawReplayBanner(); drawRun(replayState(lastServer)); }
     }
     polling = false;
 }

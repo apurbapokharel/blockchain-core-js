@@ -37,6 +37,14 @@ nodes. The user presents from a laptop over VPN and SSH, and will record a backu
   through the UI: 9 replies in 2 minutes, one block with the same hash on all nodes, all answers $5, no log errors.
 - `Mempool.pushMessage` now clears `_messagesByRounds` at init, so a second deliberation needs no restart.
 - The user removed problem 8 from the pool. Problems 6 and 9 stay out because the model fails on them.
+- Replay (2026-11-11): the UI can play a stored block again as if it were live, for the presentation loop. It
+  needs no GPU and changes nothing on the nodes. A sticky banner says that it is a replay and names the block.
+  "Replay recorded runs on a loop" in the picker cycles through the blocks from real AI runs. The Blocks tab has
+  "Replay this deliberation" for one block. Only block 3 (2026-11-06) is from the real model. Block 2 is from the
+  fake LLM.
+- Each sealed block's entry in `.demo/blocks.json` now stores `llm` ("real" or "fake") and `replyTimes` (ms after
+  the start). Replays use the recorded gaps, kept between 2 and 12 s. Older blocks without times get a gap that
+  grows with the reply length.
 
 ### Test result (one run: 3 nodes, star layout)
 Problem: "If a/b=3/4 and 8a+5b=22 and a+c = 12 ,then find the value of c." Rounds "2", turns "1", which gives
@@ -52,6 +60,7 @@ Problem: "If a/b=3/4 and 8a+5b=22 and a+c = 12 ,then find the value of c." Round
 ./demo start --nodes 3              # real model; needs about 41 GB of free GPU memory
 ./demo start --nodes 3 --fake-llm   # no GPU; uses demo-ui/fake-llm.js on port 5000
 ./demo restart-nodes                # keeps the chain
+./demo restart-ui                   # reloads demo-ui/server.js after a UI change
 ./demo reset                        # deletes the chain and the block history
 ./demo stop [--keep-llm]
 ```
@@ -64,7 +73,8 @@ To rebuild on `ceng-l-dqbx564`, use the system Python 3.10, because `node-gyp` n
 
 ## Remaining work, in order
 1. **More real model runs** on the other pool problems, to check answer extraction and header display.
-2. **Rehearsal and recorded backup**, about days 11-14 (2026-11-15 to 2026-11-18).
+2. **Rehearsal and recorded backup**, about days 11-14 (2026-11-15 to 2026-11-18). The replay loop is the backup.
+3. **Poster and video**: see `videoposter.md`.
 
 UI requirements found during the test:
 - `startDeliberation` blocks until the first LLM reply, so call it in the background or with a long timeout.

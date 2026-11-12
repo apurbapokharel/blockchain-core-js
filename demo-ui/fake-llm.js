@@ -6,8 +6,15 @@ let counter = 0;
 
 function reply(session) {
     const known = pool.find(p => p.problem === session.problem);
-    const value = known ? known.value : 42;
     const n = counter++;
+    if (known && known.kind === 'choice') {
+        // Most replies pick the right option, and every third one picks another, so the graph shows a change of mind.
+        const letters = Object.keys(known.choices);
+        const pick = n % 3 === 2 ? letters.find(l => l !== known.answer) : known.answer;
+        return `## Step 1: Weigh the options\n\nThe agent compares each option with the facts.\n\n` +
+            `**${pick}) ${known.choices[pick]}** fits best.\n\nFinal answer: ${pick}`;
+    }
+    const value = known ? known.value : 42;
     const forms = [`$\\boxed{${value}}$`, `$\\boxed{${value * 2}/2}$`, `the same value as before`];
     // The node turns each newline into a space, like a real reply.
     return `## Step 1: Read the problem\n\nThe agent restates the inputs, for example $7 and $10.\n\n## Step 2: Calculate\n\n` +

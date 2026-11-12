@@ -64,29 +64,30 @@ async function icon(name, color, px = 512) {
         color: 'E3EED0', align: 'center', objectName: 'Affiliation'});
 
     /* ---------- Hook ---------- */
-    text('Blockchains agree on data. We make them agree on decisions.', {x: 0.6, y: 6.55, w: 46.8, h: 1.4,
-        fontFace: HEAD, fontSize: 54, color: C.dark, align: 'center', valign: 'middle', objectName: 'Hook'});
+    // The poster speaks to people who do not know what a blockchain is. It says "shared record" instead.
+    text('AI agents debate until they all agree, and every party keeps the same unchangeable record.', {x: 0.6, y: 6.55,
+        w: 46.8, h: 1.4, fontFace: HEAD, fontSize: 50, color: C.dark, align: 'center', valign: 'middle', objectName: 'Hook'});
 
     /* ---------- Panel A: the problem ---------- */
     panel(0.6, 8.5, 14.2, 13.5, 'The problem', 'Problem panel');
     const rows = [
-        ['FaCheckToSlot', 'Majority vote', 'The minority is overruled, not convinced.'],
-        ['FaBolt', 'Fastest or richest leads', 'Proof of work and proof of stake pick a leader. Nobody reasons.'],
-        ['FaGaugeHigh', 'Built for speed', 'Fast agreement on transactions, not on hard questions.'],
+        ['FaRobot', 'One AI can be wrong', 'A single AI model gives one answer, with no second opinion.'],
+        ['FaCheckToSlot', 'Voting is not agreement', 'Group decisions count votes. The minority is overruled, not convinced.'],
+        ['FaFileCircleQuestion', 'No trusted record', 'Later, nobody can prove what was decided or why.'],
     ];
     for (let i = 0; i < rows.length; i++) {
-        const y = 10.7 + i * 3.0;
+        const y = 10.6 + i * 3.0;
         await iconCircle(1.2, y, 1.5, rows[i][0], C.olive);
         text([{text: rows[i][1], options: {bold: true, fontSize: 38, breakLine: true}},
             {text: rows[i][2], options: {fontSize: 32, color: C.muted}}],
             {x: 3.05, y: y - 0.05, w: 11.15, h: 2.8, paraSpaceAfter: 6, objectName: 'Problem ' + (i + 1)});
     }
-    text('Policy, legal review, and proofs need every party to agree, and a record of why.',
-        {x: 1.2, y: 19.7, w: 13.0, h: 2.0, fontSize: 32, italic: true, bold: true, color: C.green,
+    text('Hospitals, courts, and agencies need decisions that every party accepts, with proof of why.',
+        {x: 1.2, y: 19.6, w: 13.0, h: 2.2, fontSize: 32, italic: true, bold: true, color: C.green,
             objectName: 'Problem summary'});
 
     /* ---------- Panel B: the idea ---------- */
-    panel(15.4, 8.5, 17.2, 13.5, 'Our idea: deliberation as consensus', 'Idea panel');
+    panel(15.4, 8.5, 17.2, 13.5, 'Our idea: AI agents that must agree', 'Idea panel');
     const D = 2.5, R = D / 2;
     const agents = [[20.6, 12.35, C.n1], [23.55, 16.45, C.n2], [17.65, 16.45, C.n3]]; // centers
     for (let i = 0; i < 3; i++) {
@@ -104,87 +105,100 @@ async function icon(name, color, px = 512) {
         const at = i === 0 ? {x: cx - R - 4.3, y: cy - 0.4, w: 4.1, align: 'right'} : {x: cx - 2.2, y: cy + R + 0.1, w: 4.4, align: 'center'};
         text(`AI agent ${i + 1}`, {...at, h: 0.8, fontSize: 30, bold: true, color: col, objectName: `Agent ${i + 1} label`});
     }
-    text('takes\nturns', {x: 19.3, y: 14.75, w: 2.6, h: 1.5, fontSize: 30, italic: true, color: C.muted,
+    text('debate\nin turns', {x: 19.3, y: 14.75, w: 2.6, h: 1.5, fontSize: 30, italic: true, color: C.muted,
         align: 'center', valign: 'middle', objectName: 'Turns label'});
-    // Arrow from the agents to the block.
     s.addShape(pres.shapes.LINE, {x: 25.3, y: 14.4, w: 1.6, h: 0, line: {color: C.dark, width: 6, endArrowType: 'triangle'},
-        objectName: 'Seal arrow'});
+        objectName: 'Record arrow'});
     s.addShape(pres.shapes.ROUNDED_RECTANGLE, {x: 27.1, y: 10.75, w: 4.9, h: 6.9, rectRadius: 0.2,
-        fill: {color: C.dark}, line: {type: 'none'}, objectName: 'Block'});
-    s.addImage({data: await icon('FaCube', 'E3EED0'), x: 28.95, y: 11.05, w: 1.2, h: 1.2});
-    text('One sealed block', {x: 27.1, y: 12.4, w: 4.9, h: 0.7, fontSize: 30, bold: true, color: C.white,
-        align: 'center', objectName: 'Block title'});
-    text('every reply, every turn', {x: 27.1, y: 13.1, w: 4.9, h: 0.6, fontSize: 22, color: 'D6E4C4',
-        align: 'center', objectName: 'Block subtitle'});
+        fill: {color: C.dark}, line: {type: 'none'}, objectName: 'Shared record'});
+    s.addImage({data: await icon('FaFileShield', 'E3EED0'), x: 28.95, y: 11.05, w: 1.2, h: 1.2});
+    text('One shared record', {x: 27.1, y: 12.4, w: 4.9, h: 0.7, fontSize: 30, bold: true, color: C.white,
+        align: 'center', objectName: 'Record title'});
+    text('every argument, every turn', {x: 27.1, y: 13.1, w: 4.9, h: 0.6, fontSize: 22, color: 'D6E4C4',
+        align: 'center', objectName: 'Record subtitle'});
     [C.n1, C.n2, C.n3].forEach((col, i) => {
         const y = 14.0 + i * 1.12;
         s.addShape(pres.shapes.ROUNDED_RECTANGLE, {x: 27.45, y, w: 4.2, h: 0.9, rectRadius: 0.1,
             fill: {color: C.white}, line: {color: col, width: 3}});
-        text([{text: `Node ${i + 1}  `, options: {bold: true, color: col}}, {text: '#85b3…313a', options: {fontFace: 'Courier New'}}],
-            {x: 27.45, y, w: 4.2, h: 0.9, fontSize: 21, align: 'center', valign: 'middle', objectName: `Hash chip ${i + 1}`});
+        text([{text: `Party ${i + 1}  `, options: {bold: true, color: col}}, {text: 'same copy', options: {color: C.ink}}],
+            {x: 27.45, y, w: 4.2, h: 0.9, fontSize: 24, align: 'center', valign: 'middle', objectName: `Copy chip ${i + 1}`});
     });
-    const steps = ['Post a problem to the chain.', 'AI agents answer in turns, each reading the others.',
-        'When the debate ends, every node seals the same block.'];
+    const steps = ['Ask a team of AI agents a hard question.', 'Each agent answers, reads the others, and can change its mind.',
+        'When all agree, every party stores the same record. Nobody can change it later.'];
     for (let i = 0; i < 3; i++) {
         const x = 16.0 + i * 5.55;
         s.addShape(pres.shapes.OVAL, {x, y: 18.8, w: 1.0, h: 1.0, fill: {color: C.green}, line: {type: 'none'}});
         text(String(i + 1), {x, y: 18.8, w: 1.0, h: 1.0, fontFace: HEAD, fontSize: 30, color: C.white,
             align: 'center', valign: 'middle'});
-        text(steps[i], {x: x + 1.2, y: 18.75, w: 4.2, h: 3.0, fontSize: 28, objectName: `Step ${i + 1}`});
+        text(steps[i], {x: x + 1.2, y: 18.75, w: 4.2, h: 3.1, fontSize: 26, objectName: `Step ${i + 1}`});
     }
 
-    /* ---------- Panel C: proof ---------- */
-    panel(33.2, 8.5, 14.2, 13.5, 'Proof: one block, every node', 'Proof panel');
-    s.addImage({path: A('sealed-block.png'), x: 33.8, y: 10.6, w: 13.0, h: 13.0 * 1782 / 2838,
-        objectName: 'Screenshot of a sealed block'});
-    text('A live run with three AI agents. All three nodes hold the identical block, and every agent reached the correct answer.',
-        {x: 33.8, y: 19.0, w: 13.0, h: 2.8, fontSize: 32, objectName: 'Proof caption'});
+    /* ---------- Panel C: an example ---------- */
+    panel(33.2, 8.5, 14.2, 13.5, 'Example: a diagnosis', 'Example panel');
+    await iconCircle(33.8, 10.45, 1.5, 'FaStethoscope', C.olive);
+    text('A patient has a fever, a rash, and pain behind the eyes.', {x: 35.6, y: 10.4, w: 11.2, h: 1.6,
+        fontSize: 32, bold: true, valign: 'middle', objectName: 'Example case'});
+    const chipRow = async (y, label, items) => {
+        text(label, {x: 33.8, y, w: 13.0, h: 0.6, fontSize: 26, bold: true, color: C.muted, objectName: label});
+        items.forEach(([who, say, col, changed], i) => {
+            const x = 33.8 + i * 4.43;
+            s.addShape(pres.shapes.ROUNDED_RECTANGLE, {x, y: y + 0.7, w: 4.13, h: 1.5, rectRadius: 0.12,
+                fill: {color: changed ? 'FBF0D4' : C.white}, line: {color: col, width: 3}});
+            text([{text: who, options: {bold: true, color: col, fontSize: 24, breakLine: true}},
+                {text: say, options: {bold: true, fontSize: 30}}],
+                {x, y: y + 0.7, w: 4.13, h: 1.5, align: 'center', valign: 'middle', objectName: `${label} ${who}`});
+        });
+    };
+    await chipRow(12.3, 'Round 1: each agent answers alone',
+        [['AI agent 1', 'Malaria', C.n1], ['AI agent 2', 'Dengue', C.n2], ['AI agent 3', 'Dengue', C.n3]]);
+    await chipRow(14.75, 'Round 2: each agent reads the others',
+        [['AI agent 1', 'Dengue', C.n1, true], ['AI agent 2', 'Dengue', C.n2], ['AI agent 3', 'Dengue', C.n3]]);
+    text('Agent 1 changes its mind: "The rash and eye pain fit dengue better."', {x: 33.8, y: 17.05, w: 13.0, h: 0.9,
+        fontSize: 26, italic: true, color: '8A5A00', objectName: 'Change of mind'});
+    s.addShape(pres.shapes.ROUNDED_RECTANGLE, {x: 33.8, y: 18.1, w: 13.0, h: 3.6, rectRadius: 0.15,
+        fill: {color: C.dark}, line: {type: 'none'}, objectName: 'Example result'});
+    text([{text: 'All agree: dengue', options: {bold: true, fontSize: 40, breakLine: true}},
+        {text: 'The doctor, the hospital, and the insurer each keep the same record. They see why, not only what.',
+            options: {fontSize: 28, color: 'D6E4C4'}}],
+        {x: 34.3, y: 18.25, w: 12.0, h: 3.3, color: C.white, valign: 'middle', paraSpaceAfter: 6, objectName: 'Example result text'});
 
-    /* ---------- Panel D: the demo ---------- */
-    panel(0.6, 22.6, 23.1, 12.8, 'Live demo, real AI agents', 'Demo panel');
-    const stats = [['3', 'AI agents on\nthree nodes'], ['9', 'replies in\nabout 2 minutes'], ['1', 'block holds\nthe whole debate'],
-        ['3/3', 'nodes with the\nsame block hash']];
-    stats.forEach(([n, label], i) => {
-        const x = 1.2 + i * 5.5;
-        text(n, {x, y: 24.4, w: 5.2, h: 2.3, fontFace: HEAD, fontSize: 120, color: C.green, align: 'center',
-            valign: 'middle', objectName: `Stat ${i + 1}`});
-        text(label, {x, y: 26.85, w: 5.2, h: 1.9, fontSize: 30, color: C.muted, align: 'center',
-            objectName: `Stat ${i + 1} label`});
-    });
-    // The chain motif: each deliberation becomes the next block.
-    const blocks = ['Deliberation 1', 'Deliberation 2', 'Deliberation 3', 'Your problem?'];
-    blocks.forEach((b, i) => {
-        const x = 1.8 + i * 5.5, last = i === blocks.length - 1;
-        if (i) s.addShape(pres.shapes.LINE, {x: x - 1.3, y: 30.9, w: 1.3, h: 0, line: {color: C.dark, width: 5}});
-        s.addShape(pres.shapes.ROUNDED_RECTANGLE, {x, y: 29.3, w: 4.0, h: 3.2, rectRadius: 0.15,
-            fill: {color: last ? C.panel : C.dark}, line: last ? {color: C.dark, width: 3, dashType: 'dash'} : {type: 'none'}});
-        text([{text: last ? 'Next block' : `Block ${i + 1}`, options: {bold: true, fontSize: 32, breakLine: true}},
-            {text: b, options: {fontSize: 26}}],
-            {x, y: 29.3, w: 4.0, h: 3.2, color: last ? C.dark : C.white, align: 'center', valign: 'middle',
-                objectName: `Chain block ${i + 1}`});
-    });
-    text('Every finished deliberation becomes the next block in the chain.', {x: 1.2, y: 33.0, w: 21.9, h: 1.8,
-        fontSize: 30, italic: true, color: C.muted, align: 'center', objectName: 'Chain caption'});
-
-    /* ---------- Panel E: why it matters ---------- */
-    panel(24.3, 22.6, 23.1, 12.8, 'Where every party must agree', 'Uses panel');
-    const uses = [
-        ['FaLandmark', 'Government policy', 'Agencies agree on a decision, with every argument on record.'],
-        ['FaScaleBalanced', 'Legal review', 'Parties reach a ruling they all accept, and the reasoning cannot change later.'],
-        ['FaSquareRootVariable', 'Theorem proving', 'Agents check each step until the proof holds for everyone.'],
-        ['FaUsersGear', 'Shared AI decisions', 'Several AI agents, not one, stand behind the answer.'],
+    /* ---------- Panel D: who benefits ---------- */
+    panel(0.6, 22.6, 23.1, 12.8, 'Who benefits', 'Users panel');
+    const users = [
+        ['FaUserDoctor', 'Doctors and hospitals', 'A second and third opinion from AI, with the reasoning kept for review.'],
+        ['FaScaleBalanced', 'Courts and legal teams', 'Every argument is on record, and the reasons for a ruling cannot change later.'],
+        ['FaLandmark', 'Government agencies', 'Departments reach one policy decision that all of them accept.'],
+        ['FaBuilding', 'Companies that use AI', 'No single AI model decides alone, and auditors can replay every step.'],
     ];
-    for (let i = 0; i < uses.length; i++) {
-        const x = 24.9 + (i % 2) * 11.1, y = 24.6 + Math.floor(i / 2) * 4.55;
+    for (let i = 0; i < users.length; i++) {
+        const x = 1.2 + (i % 2) * 11.1, y = 24.6 + Math.floor(i / 2) * 4.55;
         s.addShape(pres.shapes.ROUNDED_RECTANGLE, {x, y, w: 10.8, h: 4.25, rectRadius: 0.15, fill: {color: C.white},
-            line: {color: 'C9D8B0', width: 1.5}, objectName: `Use ${i + 1} card`});
-        await iconCircle(x + 0.4, y + (4.25 - 1.6) / 2, 1.6, uses[i][0], C.green);
-        text([{text: uses[i][1], options: {bold: true, fontSize: 40, breakLine: true}},
-            {text: uses[i][2], options: {fontSize: 33, color: C.muted}}],
-            {x: x + 2.3, y: y + 0.3, w: 8.2, h: 3.65, valign: 'middle', paraSpaceAfter: 8, objectName: `Use ${i + 1}`});
+            line: {color: 'C9D8B0', width: 1.5}, objectName: `User ${i + 1} card`});
+        await iconCircle(x + 0.4, y + (4.25 - 1.6) / 2, 1.6, users[i][0], C.green);
+        text([{text: users[i][1], options: {bold: true, fontSize: 36, breakLine: true}},
+            {text: users[i][2], options: {fontSize: 30, color: C.muted}}],
+            {x: x + 2.3, y: y + 0.3, w: 8.2, h: 3.65, valign: 'middle', paraSpaceAfter: 8, objectName: `User ${i + 1}`});
     }
-    text('Ask us for a live demo.', {x: 24.9, y: 33.85, w: 21.9, h: 0.95, fontFace: HEAD, fontSize: 40,
-        color: C.green, align: 'center', valign: 'middle', objectName: 'Call to action'});
+    text('Anyone who must decide together, and prove it later.', {x: 1.2, y: 33.85, w: 21.9, h: 0.95,
+        fontSize: 32, italic: true, bold: true, color: C.green, align: 'center', valign: 'middle', objectName: 'Users summary'});
+
+    /* ---------- Panel E: what they gain ---------- */
+    panel(24.3, 22.6, 23.1, 12.8, 'What they gain', 'Benefits panel');
+    const gains = [
+        ['FaLightbulb', 'Better answers', 'The agents catch each other\'s mistakes before they agree.'],
+        ['FaHandshake', 'Real agreement, not a vote', 'The decision stands only when every agent accepts it.'],
+        ['FaFileShield', 'A record nobody can change', 'Every argument is stored, so anyone can check how the decision was made.'],
+        ['FaCopy', 'No single owner', 'Each party keeps its own identical copy of the record.'],
+    ];
+    for (let i = 0; i < gains.length; i++) {
+        const y = 24.5 + i * 2.3;
+        await iconCircle(24.9, y + 0.15, 1.5, gains[i][0], C.olive);
+        text([{text: gains[i][1], options: {bold: true, fontSize: 36, breakLine: true}},
+            {text: gains[i][2], options: {fontSize: 30, color: C.muted}}],
+            {x: 26.75, y, w: 20.1, h: 2.2, valign: 'middle', objectName: `Gain ${i + 1}`});
+    }
+    text('Live demo: three AI agents reach one shared record in about 2 minutes. Ask us to run it.', {x: 24.9, y: 33.85,
+        w: 21.9, h: 0.95, fontFace: HEAD, fontSize: 32, color: C.green, align: 'center', valign: 'middle', objectName: 'Call to action'});
 
     await pres.writeFile({fileName: OUT});
     console.log('wrote', OUT);

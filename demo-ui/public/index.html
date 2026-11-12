@@ -23,36 +23,60 @@
 
   <section id="view-run">
     <section id="stage-pick" hidden>
-      <div class="pick">
-        <div>
-          <h2>Choose a problem</h2>
-          <div id="pool" class="pool"></div>
+      <div class="hero">
+        <div class="hero-text">
+          <p class="eyebrow">Unanimous consensus through AI deliberation</p>
+          <h1>Blockchains agree on data. We make them agree on decisions.</h1>
+          <p class="lede">Blockchains today settle a question by counting votes or by picking the fastest node, and
+            nobody gives a reason. Here, AI agents on separate blockchain nodes debate a real case in turns. The chain
+            records the decision only when every node holds the same result.</p>
+          <div class="benefits">
+            <div><span class="b-title">Every argument on record</span><span>Each reply goes into the block, so anyone can audit how the decision was made.</span></div>
+            <div><span class="b-title">No single AI decides</span><span>Each agent reads the others and can change its mind.</span></div>
+            <div><span class="b-title">Same result on every node</span><span>The block is sealed only when all nodes hold the same hash.</span></div>
+          </div>
         </div>
-        <form id="editor" class="editor">
-          <label for="problem">Problem</label>
-          <textarea id="problem" rows="9" required></textarea>
+        <div id="hero-art" class="hero-art" aria-hidden="true"></div>
+      </div>
+
+      <h2>Pick a case for the agents</h2>
+      <div id="cases" class="cases"></div>
+      <div class="more"><span class="note">Quick math checks:</span><div id="pool" class="chips"></div></div>
+
+      <form id="editor" class="editor">
+        <div class="editor-main">
+          <label for="problem">The case the agents receive. You can edit it or write your own.</label>
+          <textarea id="problem" rows="6" required></textarea>
+        </div>
+        <div class="editor-side">
           <div class="fields">
             <label>Rounds <input id="rounds" type="number" min="1" max="5" value="2" required></label>
             <label>Turns <input id="turns" type="number" min="1" max="5" value="1" required></label>
           </div>
-          <button id="start" class="primary" type="submit">Start deliberation</button>
+          <button id="start" class="primary big" type="submit">Start deliberation</button>
           <p id="start-note" class="note"></p>
           <button id="replay-loop" class="secondary" type="button">Replay recorded runs on a loop</button>
           <p class="note">Plays the stored real AI runs again, for a presentation. It does not use the GPU.</p>
-        </form>
-      </div>
+        </div>
+      </form>
     </section>
 
     <section id="stage-live" hidden>
       <div class="problem-bar">
-        <div id="live-problem" class="problem-text"></div>
+        <div id="live-title" class="live-title"></div>
+        <div id="live-problem" class="problem-text" title="Click to show the whole case"></div>
         <div id="progress" class="progress-text"></div>
         <div class="bar"><div id="bar-fill"></div></div>
       </div>
+      <p id="step-text" class="step-text"></p>
+      <div id="graph" class="graph"></div>
       <div id="seal" class="seal" hidden></div>
-      <div id="cards" class="cards"></div>
-      <h2 id="transcript-title">Transcript</h2>
-      <div id="transcript" class="transcript"></div>
+      <h2 id="timeline-title">What each agent said</h2>
+      <ol id="timeline" class="timeline"></ol>
+      <details id="transcript-box" class="transcript-box" open>
+        <summary id="transcript-title">Full replies</summary>
+        <div id="transcript" class="transcript"></div>
+      </details>
     </section>
   </section>
 

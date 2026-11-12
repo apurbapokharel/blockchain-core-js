@@ -89,6 +89,14 @@ NODE_PATH=/some/folder/node_modules node poster/build.js
 cd poster && soffice --headless --convert-to pdf poster.pptx
 ```
 
+## Poster draft 2 (2026-11-12)
+
+Dr. Dantu asked for a poster that people understand without knowing what a blockchain is. It must state the
+problem, name the users and how they benefit, and give one example at a high level. Draft 2 says "shared record"
+instead of "block" and does not use the word blockchain outside the title. Its panels are the problem, the idea,
+an example diagnosis (one agent changes its mind, and all agree on dengue), who benefits (doctors, courts,
+government agencies, companies), and what they gain. The screenshot and the chain of blocks are gone.
+
 Known issue: the right photo in the template is only 95 by 119 pixels, so it prints blurry at 4 inches. A larger
 photo goes in `poster/assets/headshot-right.png`.
 

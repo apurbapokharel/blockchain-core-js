@@ -61,10 +61,46 @@ function toNumber(raw) {
     if (!m) return null;
     return m[2] ? Number(m[1]) / Number(m[2]) : Number(m[1]);
 }
+// A multiple-choice reply names one letter. The last clear statement wins, because agents restate their answer at the end.
+function extractChoice(text, letters) {
+    const L = `[${letters}]`;
+    const boxed = lastBoxed(text);
+    if (boxed !== null) {
+        const m = boxed.match(new RegExp(`(?:^|[^A-Za-z])(${L})(?![A-Za-z])`));
+        if (m) return m[1];
+    }
+    const patterns = [
+        new RegExp(`final answer\\W{0,6}(?:is\\W{0,4})?(?:option\\s+)?\\(?(${L})(?![A-Za-z])(?!\\s+[a-z])`, 'gi'),
+        new RegExp(`answer is\\W{0,4}(?:option\\s+)?\\(?(${L})(?![A-Za-z])(?!\\s+[a-z])`, 'gi'),
+        new RegExp(`option\\s+\\(?(${L})\\)?(?![A-Za-z])`, 'gi'),
+    ];
+    for (const re of patterns) {
+        const all = [...text.matchAll(re)];
+        if (all.length) return all[all.length - 1][1].toUpperCase();
+    }
+    return null;
+}
+const isChoice = known => known && known.kind === 'choice';
+// The short form of one reply, for the graph view: the answer that the reply states, or null.
+function gistFor(text, known) {
+    if (isChoice(known)) {
+        const letter = extractChoice(text, Object.keys(known.choices).join(''));
+        return letter ? {answer: letter, label: known.choices[letter] || null} : null;
+    }
+    const raw = extractAnswer(text);
+    const value = toNumber(raw);
+    return value === null ? null : {answer: raw, value};
+}
 function answersFor(messages, known) {
     const last = new Map();
     for (const m of messages) last.set(m.node, m.text);
+    const choice = isChoice(known);
     const rows = [...last.entries()].sort((a, b) => a[0] - b[0]).map(([node, text]) => {
+        if (choice) {
+            const g = gistFor(text, known);
+            return {node, raw: g ? g.answer : null, value: g ? g.answer : null, label: g ? g.label : null,
+                unclear: !g, correct: g ? g.answer === known.answer : null};
+        }
         const raw = extractAnswer(text);
         const value = toNumber(raw);
         const correct = known && value !== null ? Math.abs(value - known.value) <= known.tolerance : null;
@@ -72,7 +108,7 @@ function answersFor(messages, known) {
     });
     const clear = rows.filter(r => !r.unclear);
     const agree = rows.length > 0 && clear.length === rows.length
-        && clear.every(r => Math.abs(r.value - clear[0].value) < 1e-6);
+        && clear.every(r => choice ? r.value === clear[0].value : Math.abs(r.value - clear[0].value) < 1e-6);
     return {rows, agree, unclearCount: rows.length - clear.length};
 }
 
@@ -115,7 +151,7 @@ function transcript() {
     if (run.phase === 'starting' || !lead || !run.problem || lead.state.problem !== run.problem) return [];
     return lead.state.replies.map(r => ({
         key: `${r.round},${r.turn},${r.speakerIndex}`, round: r.round, turn: r.turn,
-        node: nodeOf(lead.state.participants[r.speakerIndex]), text: r.text,
+        node: nodeOf(lead.state.participants[r.speakerIndex]), text: r.text, gist: gistFor(r.text, run.known),
     }));
 }
 function setError(message) {
@@ -193,6 +229,7 @@ function decodeMessages(extraData, entry) {
         m.key = String(i);
         m.round = p ? p.round : null;
         m.turn = p ? p.turn : null;
+        m.gist = gistFor(m.text, entry && entry.known);
     });
     return out;
 }
@@ -233,11 +270,15 @@ async function listBlocks() {
 }
 
 /* ---------- commands ---------- */
+// What the UI needs to know about a pool problem. A sealed block keeps this in .demo/blocks.json.
+const knownOf = p => p.kind === 'choice'
+    ? {kind: 'choice', title: p.title, domain: p.domain, answer: p.answer, answerText: `${p.answer}) ${p.choices[p.answer]}`, choices: p.choices}
+    : {kind: 'number', title: p.title, answer: p.answer, value: p.value, tolerance: p.tolerance};
 async function beginRun(problem, rounds, turns) {
     const known = POOL.find(p => p.problem === problem) || null;
     run = {
         phase: 'starting', problem, rounds, turns, startedAt: Date.now(), lastReplyAt: Date.now(), replyCount: 0, seen: {},
-        known: known ? {answer: known.answer, value: known.value, tolerance: known.tolerance} : null,
+        known: known ? knownOf(known) : null,
     };
     stableTicks = 0;
     lastCounts = '';
@@ -283,7 +324,7 @@ function statePayload() {
     const held = n => (run.phase !== 'starting' && n.state && n.state.problem === run.problem ? n.state.replies.length : 0);
     return {
         now: Date.now(), phase: run.phase, error: run.error || null, problem: run.problem || null,
-        rounds: run.rounds || null, turns: run.turns || null,
+        rounds: run.rounds || null, turns: run.turns || null, known: run.known || null,
         expected: run.rounds ? passes(run.rounds, run.turns).length * N : null,
         startedAt: run.startedAt || null, finishedAt: run.finishedAt || null, lastReplyAt: run.lastReplyAt || null,
         stalled: run.phase === 'running' && Date.now() - run.lastReplyAt > STALL_MS,
@@ -324,7 +365,7 @@ http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     try {
         if (url.pathname === '/api/state') return json(res, 200, statePayload());
-        if (url.pathname === '/api/problems') return json(res, 200, POOL.map(({id, title, problem}) => ({id, title, problem})));
+        if (url.pathname === '/api/problems') return json(res, 200, POOL.map(({id, group, kind, icon, domain, title, teaser, source, problem}) => ({id, group, kind, icon, domain, title, teaser, source, problem})));
         if (url.pathname === '/api/blocks') return json(res, 200, await listBlocks());
         const m = url.pathname.match(/^\/api\/blocks\/(\d+)$/);
         if (m) {

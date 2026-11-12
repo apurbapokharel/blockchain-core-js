@@ -42,6 +42,12 @@ nodes. The user presents from a laptop over VPN and SSH, and will record a backu
   "Replay recorded runs on a loop" in the picker cycles through the blocks from real AI runs. The Blocks tab has
   "Replay this deliberation" for one block. Only block 3 (2026-11-06) is from the real model. Block 2 is from the
   fake LLM.
+- UI rework (2026-11-12, after the professor's feedback): the landing page has a hero with the problem and the
+  benefits, and cases from `~/ap1923/betterDeliberation`: 4 medical diagnoses (symptom dataset: dengue, tuberculosis,
+  heart attack, hyperthyroidism) and 4 legal cases (MMLU-Pro law, each cut to 4 options). Only 3 math problems stay,
+  as small chips. Store clearance stays because block 3, the real recorded run, uses it. A run shows a graph of the agents with each agent's current answer, then a one-line timeline,
+  then the full replies. Multiple-choice answers come from "Final answer: <letter>". Neither case has run on the
+  real model yet. `video/build.js` still expects the old card layout, so the video needs changes before a rebuild.
 - Each sealed block's entry in `.demo/blocks.json` now stores `llm` ("real" or "fake") and `replyTimes` (ms after
   the start). Replays use the recorded gaps, kept between 2 and 12 s. Older blocks without times get a gap that
   grows with the reply length.
